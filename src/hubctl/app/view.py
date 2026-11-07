@@ -374,7 +374,7 @@ def _detail_row(label, value, token, style):
             + style(value, token))
 
 
-def _port_detail_rows(snapshot, state, style):
+def _port_detail_rows(snapshot, state, style, usb):
     values = menu.readout(snapshot, state.port)
     power_token = menu.OK if values.power_on else menu.DIM
     data_token = menu.OK if values.data_on else menu.DIM
@@ -389,6 +389,14 @@ def _port_detail_rows(snapshot, state, style):
     )
     for offset, (label, value, token) in enumerate(fields):
         rows[LIST_ROW + offset] = _detail_row(label, value, token, style)
+    if usb is not None:
+        rows[LIST_ROW + 4] = _detail_row("usb", f"{usb.vid}:{usb.pid}",
+                                         menu.TEXT, style)
+        rows[LIST_ROW + 5] = _detail_row("product", usb.product or "?",
+                                         menu.TEXT, style)
+    else:
+        reason = "data off" if values.data_word != "on" else "no device"
+        rows[LIST_ROW + 4] = _detail_row("usb", reason, menu.DIM, style)
     rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style)
     return rows
 
@@ -408,7 +416,7 @@ def _settings_rows(snapshot, state, style):
     return rows
 
 
-def _screen_rows(snapshot, state, style):
+def _screen_rows(snapshot, state, style, usb=None):
     if state.screen == menu.MENU:
         return _menu_rows(snapshot, state, style)
     if state.screen == menu.DEVICE:
@@ -416,7 +424,7 @@ def _screen_rows(snapshot, state, style):
     if state.screen == menu.HELP:
         return _help_rows(snapshot, state, style)
     if state.screen == menu.PORT:
-        return _port_detail_rows(snapshot, state, style)
+        return _port_detail_rows(snapshot, state, style, usb)
     if state.screen == menu.SETTINGS:
         return _settings_rows(snapshot, state, style)
     return _control_rows(snapshot, state, style)
@@ -453,7 +461,7 @@ def _footer_text(snapshot, state):
 
 
 def render(snapshot: Snapshot, state: menu.State, width: int, height: int,
-           color: bool = True, utf8: bool = True):
+           color: bool = True, utf8: bool = True, usb=None):
     """Return exactly ``height`` lines of exactly ``width`` visible columns."""
     style = Style(color)
     glyph = "\u2502" if utf8 else "|"
@@ -463,7 +471,7 @@ def render(snapshot: Snapshot, state: menu.State, width: int, height: int,
     lines = [_header(_heading(snapshot, state), badge, token,
                      width, style, glyph)]
     if height >= 2:
-        rows = _screen_rows(snapshot, state, style)
+        rows = _screen_rows(snapshot, state, style, usb)
         if snapshot.identity is not None:
             rows[height - LAST_ROW_FROM_END] = _last_row(snapshot, style)
         body = [rows.get(row, "") for row in range(2, height)]

@@ -14,9 +14,17 @@ from hubctl.app.view import (
     INTERLOCK_BANNER,
     vlen,
 )
-from hubctl.hal.base import LinkState, Mode
+from hubctl.hal.base import ChannelReading, LinkState, Mode
+from hubctl.hal.usbmap import UsbDevice
 
 from .helpers import SELECTED, frame, make_no_device, make_snapshot, plain
+
+
+def make_port_on():
+    snapshot = make_snapshot(
+        action="connected HBP_USB2_4CH on /dev/ttyACM0")
+    snapshot.channels[2] = ChannelReading(True, True, 4610, 0)
+    return snapshot
 
 MOCKUP = Path(__file__).resolve().parents[1] / "docs/ui/mockup/index.html"
 
@@ -51,21 +59,41 @@ def mockup_cases():
          menu.State(menu.HELP), 80, 24),
         (make_snapshot(action="connected HBP_USB2_4CH on /dev/ttyACM0"),
          menu.State(menu.PORT, port=2), 80, 24),
+        (make_port_on(), menu.State(menu.PORT, port=2), 80, 24,
+         UsbDevice("045e", "028e", "Xbox 360 pad")),
         (make_snapshot(action="connected HBP_USB2_4CH on /dev/ttyACM0",
                        port="/dev/ttyACM0", port_choices=("/dev/ttyACM0",)),
          menu.State(menu.SETTINGS), 80, 24),
     ]
 
 
+class PortDetailTests(unittest.TestCase):
+    def test_usb_rows_show_the_device(self):
+        snapshot = make_port_on()
+        lines = plain(frame(snapshot, menu.State(menu.PORT, port=2),
+                            usb=UsbDevice("045e", "028e", "Xbox 360 pad")))
+        self.assertIn("045e:028e", lines[8])
+        self.assertIn("Xbox 360 pad", lines[9])
+
+    def test_data_off_explains_the_missing_usb_info(self):
+        lines = plain(frame(make_snapshot(), menu.State(menu.PORT, port=2)))
+        self.assertIn("data off", lines[8])
+
+    def test_no_device_on_this_host_says_so(self):
+        lines = plain(frame(make_port_on(), menu.State(menu.PORT, port=2)))
+        self.assertIn("no device", lines[8])
+
+
 class MockupTests(unittest.TestCase):
     def test_all_mockup_frames_reproduce_character_for_character(self):
         expected = mockup_frames()
         cases = mockup_cases()
-        self.assertEqual(len(expected), 12)
-        self.assertEqual(len(cases), 12)
-        for number, (block, (snapshot, state, width, height)) in enumerate(
-                zip(expected, cases)):
-            lines = plain(frame(snapshot, state, width, height))
+        self.assertEqual(len(expected), 13)
+        self.assertEqual(len(cases), 13)
+        for number, (block, case) in enumerate(zip(expected, cases)):
+            snapshot, state, width, height, *extra = case
+            options = {"usb": extra[0]} if extra else {}
+            lines = plain(frame(snapshot, state, width, height, **options))
             self.assertEqual("\n".join(lines), block, f"frame {number}")
 
 

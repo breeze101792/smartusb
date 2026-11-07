@@ -230,7 +230,7 @@ kbd{
   <h1>hubctl - interface reference</h1>
   <p class="lede">hubctl is one page: USB Control, a live list of four ports with power, data, voltage, and current. <code>m</code> opens a global menu over the port list; Device, Settings and Help are reached from it. Enter on a port opens its detail page, where the monitor and advanced controls will go. The app sets no background; header and footer are reverse video, and colour appears only on state values.</p>
   <div class="meta">
-    <span>12 frames</span>
+    <span>13 frames</span>
     <span>80x24 baseline</span>
     <span>60x16 minimum</span>
     <span>terminal default</span>
@@ -608,7 +608,7 @@ kbd{
    <span class="bd">│</span>   <span class="lab">data        </span><span class="dm">-</span>                                                       <span class="bd">│</span>    
    <span class="bd">│</span>   <span class="lab">voltage     </span><span class="dm">(202 mV)</span>                                                <span class="bd">│</span>    
    <span class="bd">│</span>   <span class="lab">current     </span><span class="tx">0.00 A</span>                                                  <span class="bd">│</span>    
-   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">usb         </span><span class="dm">data off</span>                                                <span class="bd">│</span>    
    <span class="bd">│</span>                                                                       <span class="bd">│</span>    
    <span class="bd">│</span>                                                                       <span class="bd">│</span>    
    <span class="bd">│</span>                                                                       <span class="bd">│</span>    
@@ -625,8 +625,42 @@ kbd{
    <span class="bd">│</span>   <span class="dm">last    </span><span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                      <span class="bd">│</span>    
    <span class="bd">│</span><span class="bar">ENTER back   q back</span><span class="bar">                                                    </span><span class="bd">│</span>    </pre>
       </div>
-      <figcaption class="notes"><p>Enter on a port opens its detail page. It names the port, shows the live reading with one labelled field per value, and leaves the space below for the monitor and advanced controls that come next. Enter, q or Esc returns to control; nothing here writes.</p></figcaption>
+      <figcaption class="notes"><p>Enter on a port opens its detail page. It names the port, shows the live reading with one labelled field per value, and, while data is on, the device this host sees on that port. With data off the usb row says so. Enter, q or Esc returns to control; nothing here writes.</p></figcaption>
     </figure>
+    <figure class="term edge-ok">
+      <div class="term-bar">
+        <span class="term-label"><span class="term-key">M</span>port detail - device</span>
+        <span class="term-size">80x24</span>
+      </div>
+      <div class="screen">
+<pre class="frame" role="img" aria-label="Frame M: Port detail page, USB PORT 2 on, device visible on this host, Back selected, 24 rows by 80 columns.">   <span class="bd">│</span><span class="bar">HUBCTL  USB PORT 2 - ON - data on                               </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">port </span><span class="tx">/dev/ttyACM0</span>   <span class="tx">1a86:fe0c</span>   <span class="ok">live</span>                                <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">power       </span><span class="ok">ON</span>                                                      <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">data        </span><span class="ok">on</span>                                                      <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">voltage     </span><span class="tx">4.61 V</span>                                                  <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">current     </span><span class="tx">0.00 A</span>                                                  <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">usb         </span><span class="tx">045e:028e</span>                                               <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">product     </span><span class="tx">Xbox 360 pad</span>                                            <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="sel">Back </span>                                                               <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">last    </span><span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                      <span class="bd">│</span>    
+   <span class="bd">│</span><span class="bar">ENTER back   q back</span><span class="bar">                                                    </span><span class="bd">│</span>    </pre>
+      </div>
+      <figcaption class="notes"><p>When D+/D- is on and the device enumerates on this host, the detail page adds its VID:PID and product string. With data off, or nothing found, the usb row says why and the product row stays blank.</p></figcaption>
+    </figure>
+
 
   </div>
 </section>

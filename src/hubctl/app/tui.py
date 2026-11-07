@@ -11,7 +11,9 @@ from ..constants import (
     MIN_WIDTH,
     REDRAW_INTERVAL_S,
     TICK_MS,
+    USB_REFRESH_S,
 )
+from ..hal import usbmap
 from . import menu
 from .controller import Controller
 from .term import Terminal
@@ -58,6 +60,9 @@ def _loop(controller: Controller, terminal: Terminal, color: bool,
     last_draw = 0.0
     last_size = None
     last_event = {key: None for key in menu.GUARDED_KEYS}
+    usb_port = None
+    usb_value = None
+    usb_at = 0.0
 
     while True:
         now = clock()
@@ -76,8 +81,15 @@ def _loop(controller: Controller, terminal: Terminal, color: bool,
                 terminal.draw([
                     f"terminal too small - need {MIN_WIDTH}x{MIN_HEIGHT}"])
             else:
+                usb = None
+                if (state.screen == menu.PORT
+                        and menu.readout(snapshot, state.port).data_word == "on"):
+                    if usb_port != state.port or now - usb_at >= USB_REFRESH_S:
+                        usb_port, usb_at = state.port, now
+                        usb_value = usbmap.port_device(state.port)
+                    usb = usb_value
                 terminal.draw(render(snapshot, state, width, height,
-                                     color, utf8))
+                                     color, utf8, usb))
             last_draw = now
             dirty = False
 

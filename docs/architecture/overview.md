@@ -274,10 +274,11 @@ downstream sysfs device map, non-interactive CLI output, mouse.
 | Driver: identity, masks, reads, writes, rejection, silence, allow-list | pty fake device | host — 10 pass |
 | Controller: poll schedule, write verify, staleness, reconnect, result strings, port and poll settings | fake driver, injectable clock | host — 23 pass |
 | Menu model: port list, port detail, global menu, Settings, Enter never writes, key routing | pure `menu` assertions | host — 32 pass |
-| Render: frame, states, width/height sweep, clipping, selection without colour, twelve mockup frames | pure `render()` assertions | host — 32 pass |
-| TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, per-key repeat guard, quit | fake controller, terminal and clock | host — 18 pass |
+| Render: frame, states, width/height sweep, clipping, selection without colour, thirteen mockup frames | pure `render()` assertions | host — 35 pass |
+| TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, usb map read only with data on, every screen redrawn, per-key repeat guard | fake controller, terminal and clock | host — 21 pass |
 | Discovery filters `fe0c` and rejects `8091` | fake sysfs tree | host — 2 pass |
 | Key decode: arrows, lone Esc, unknown sequences ignored, plain keys | raw pipe fd | host — 4 pass |
+| Downstream USB map: hub discovery, port child, empty port, missing tree | fake sysfs tree | host — 4 pass |
 | App starts, toggles a port, opens the menu, quits, restores the screen | real app process in a pty | host — 2 pass |
 | Identity, mode, channel reads on the unit | app read-only run, raw trace | on target — pass |
 | Lab tool after the shared-codec refactor | `--self-test`; default read-only run | 20/20; 12/12 |

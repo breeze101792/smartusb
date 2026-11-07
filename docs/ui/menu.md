@@ -106,10 +106,19 @@ is powered. Status line: `port <port>   1a86:fe0c   <link>`.
 | 6 | `data` | `on`, `off`, `-` or `?` |
 | 7 | `voltage` | `4.61 V`, `(202 mV)` or `?` |
 | 8 | `current` | `0.00 A` or `?` |
+| 9 | `usb` | `045e:028e`, `data off` or `no device` |
+| 10 | `product` | the device's product string, when row 9 has a device |
 
 Labels at column 8, values at column 20, in the same tokens as the port row.
-Rows 9..12 stay free for the monitor and advanced controls that come next.
+Rows 11 and 12 stay free for the monitor and advanced controls that come next.
 `Back` is the only item, at row 13, selected.
+
+The `usb` and `product` rows come from this host's sysfs, under the DATA hub
+`1a86:8091` and downstream port `n`. They are read only while D+/D- is `on`:
+with data off the port is not connected to the host, so row 9 reads `data off`
+and row 10 is blank. With data on and no device enumerated, row 9 reads
+`no device`. A device on another host cannot appear, by definition. This is
+read-only; it never writes the hub or the downstream device.
 
 Footer: `ENTER back   q back`. `Enter`, `q`, `Esc` and `m` return to the control
 page with the same port selected. `Space` and `d` do nothing here: this page
@@ -331,7 +340,8 @@ supported hardware; the case is unverified.
 ## 9. Out of scope
 
 The port detail page is read-only in v1. The monitor and advanced controls that
-fill rows 9..12 come later. No mouse, no scrolling lists, no port names or aliases, no downstream
+fill rows 11 and 12 come later. No downstream device is configured, reset or
+opened; only its identity is read from sysfs. No mouse, no scrolling lists, no port names or aliases, no downstream
 device map, no persistent settings writes, no reset or firmware update, no V2/V3
 streaming, no interlock control.
 
@@ -345,6 +355,7 @@ streaming, no interlock control.
 | Selection is one reverse-video row on ports and in the menu, survives `NO_COLOR` | assert `SGR 7` on exactly one row | host |
 | `m` replaces the port rows with the menu, keeps header, status, `last`, footer | render assertion | host |
 | Enter opens the selected port detail with four labelled fields; Enter, q, Esc and m return | render and TUI assertions | host |
+| Port detail shows the downstream device only with data on and a matching sysfs child | render, usbmap and TUI assertions | host |
 | `m`, `Esc` and `q` close the menu and never quit | TUI loop with a fake controller | host |
 | Menu items `Device`, `Settings` and `Help`; `j`/`k` wrap and Enter opens the selection | menu and TUI assertions | host |
 | Help shows the package version and the key list; Enter, q, Esc and m return | render and TUI assertions | host |

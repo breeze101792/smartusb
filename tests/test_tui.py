@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from hubctl.app.tui import _loop
 from hubctl.app.view import (
@@ -222,6 +223,39 @@ class RefreshTests(unittest.TestCase):
              ("r", 1.5), ("q", 2.0), ("q", 2.5)])
         self.assertEqual(code, 0)
         self.assertEqual(controller.refreshes, 3)
+
+    def test_port_detail_reads_the_usb_map_only_with_data_on(self):
+        with mock.patch("hubctl.app.tui.usbmap.port_device",
+                        return_value=None) as lookup:
+            code, _controller, _terminal = run_loop(
+                [("enter", 0.0), ("r", 0.2), ("r", 0.9), ("q", 1.4),
+                 ("q", 1.9)])
+        self.assertEqual(code, 0)
+        self.assertGreaterEqual(lookup.call_count, 1)
+
+    def test_usb_map_is_not_read_on_the_control_page(self):
+        with mock.patch("hubctl.app.tui.usbmap.port_device",
+                        return_value=None) as lookup:
+            code, _controller, _terminal = run_loop([("q", 0.0)])
+        self.assertEqual(code, 0)
+        lookup.assert_not_called()
+
+    def test_every_screen_redraws_without_an_error(self):
+        code, controller, terminal = run_loop([
+            ("r", 0.0),
+            ("enter", 0.5), ("r", 0.7), ("r", 1.2), ("q", 1.7),
+            ("m", 2.2), ("r", 2.4),
+            ("enter", 2.9), ("r", 3.1), ("r", 3.6), ("q", 4.1),
+            ("m", 4.6), ("j", 4.8), ("enter", 5.3), ("r", 5.5),
+            ("right", 5.7), ("r", 6.2), ("q", 6.7),
+            ("m", 7.2), ("j", 7.4), ("j", 7.6), ("enter", 8.1),
+            ("r", 8.3), ("r", 8.8), ("q", 9.3),
+            ("q", 9.8),
+        ])
+        self.assertEqual(code, 0)
+        self.assertGreater(len(terminal.frames), 20)
+        self.assertEqual(controller.power, [])
+        self.assertEqual(controller.data, [])
 
     def test_settings_changes_poll_and_port(self):
         code, controller, terminal = run_loop(

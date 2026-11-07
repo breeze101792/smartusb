@@ -13,6 +13,8 @@ Python standard library only. Linux and macOS. The vendor SDK under
   control page, one row per port.
 - Switches VBUS and D+/D- on the selected port, then reads both states back.
 - Opens a global menu with `m`; it holds `Device`, `Settings` and `Help`.
+- On a port detail page, shows the downstream USB device (VID:PID and product)
+  when D+/D- is on and the device is visible on this host.
 - Shows LIVE / STALE / LOST; switching is disabled when the link is stale or the
   unit is in interlock mode.
 - Blocks NVM writes, reset, reboot, factory reset, interlock control and V3

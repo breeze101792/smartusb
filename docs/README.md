@@ -45,7 +45,8 @@ log.
 
 Control app implemented. `src/hubctl` runs one USB Control page against the CMD
 port: identity, mode, per-port power/data/voltage/current, a read-only detail
-page per port, a Settings page for the endpoint and poll period, and guarded
+page per port with the downstream USB identity when data is on, a Settings
+page for the endpoint and poll period, and guarded
 VBUS/D+/D- switching on the selected port. `m` opens a global menu with
 `Device`, `Settings` and `Help`. The host suite, the pty app test, the
 refactored lab-tool self-test, and a read-only on-target run pass. Real VBUS
