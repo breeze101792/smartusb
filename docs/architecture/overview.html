@@ -124,7 +124,7 @@
     <a href="#invariants">INVARIANTS</a>
     <a href="#extend">FUTURE HW</a>
     <a href="#open">OPEN</a>
-    <a href="../ui/dashboard.md">UI SPEC &rarr;</a>
+    <a href="../ui/menu.md">UI SPEC &rarr;</a>
   </nav>
 
   <section class="block" id="stack">
@@ -137,7 +137,7 @@
           <div class="layer-head"><span class="tag">TUI</span><span class="files">app/tui.py &middot; app/view.py &middot; app/term.py</span></div>
           <p>Raw ANSI, alternate screen, key dispatch, resize. <code>render()</code> returns styled lines; it never touches a device.</p>
         </div>
-        <div class="arrow">Snapshot, selected channel &middot; key intents</div>
+        <div class="arrow">Snapshot, screen state &middot; key intents</div>
 
         <div class="layer">
           <div class="layer-head"><span class="tag">Controller</span><span class="files">app/controller.py</span></div>
@@ -182,7 +182,7 @@
     <p class="sub">No worker thread. <code>select(..., 50 ms)</code> bounds the wait; then one device request runs. A full poll is a queue of requests drained across ticks.</p>
 
     <div class="timeline">
-      <div class="step"><div class="num">01 &middot; INPUT</div><h3>select, 50 ms</h3><p>A key runs its action. A toggle performs the whole write path synchronously; a selection only changes local state.</p></div>
+      <div class="step"><div class="num">01 &middot; INPUT</div><h3>select, 50 ms</h3><p>A key routes through the menu model. A toggle performs the whole write path synchronously; moving the selection only changes local state.</p></div>
       <div class="step"><div class="num">02 &middot; DEVICE</div><h3>one request</h3><p>If no key arrived, issue the next request in the poll cycle. A timeout costs at most 0.35 s and is the only source of UI lag.</p></div>
       <div class="step"><div class="num">03 &middot; DRAW</div><h3>only if changed</h3><p>The snapshot is the single input to <code>render()</code>. Staleness and link state are fields on it, not computed twice.</p></div>
     </div>
@@ -297,8 +297,8 @@ ChannelReading(power, data, voltage_mv, current_ma)   <span class="c"># None = n
 
   <footer>
     Draft architecture for review &middot; the full text is <a href="./overview.md">ARCH-001</a> &middot;
-    the TUI states are in <a href="../ui/mockup/index.html">the UI mockup</a>; run
-    <code>docs/ui/mockup/preview.py</code> to see them in a terminal.
+    the menu states are in <a href="../ui/mockup/index.html">the UI mockup</a>; open the page to see
+    all eight frames.
   </footer>
 </div>
 </body>

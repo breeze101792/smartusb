@@ -33,9 +33,8 @@ log.
 | — | `scripts/lab_verify.py --allow-switch --find-device` | Identifies the channel that enumerates a new downstream device |
 | ARCH-001 | [Control-app architecture](./architecture/overview.md) | Implemented — layer, module, and contract view |
 | — | [Architecture review page](./architecture/overview.html) | Implemented — visual companion |
-| UI-DASH-001 | [Dashboard TUI spec](./ui/dashboard.md) | Implemented — matches `src/hubctl` |
-| — | [UI mockup](./ui/mockup/index.html) | Reference — static ANSI rendering |
-| — | [ANSI preview](./ui/mockup/preview.py) | Reference — runnable, four states |
+| UI-MENU-002 | [Control-page spec](./ui/menu.md) | Implemented — matches `src/hubctl` |
+| — | [UI mockup](./ui/mockup/index.html) | Approved — static ANSI rendering, eight states |
 | IF-PROTO-001 | [Wire protocol contract](./contracts/protocols.md) | Implemented |
 | T-PLAN-001 | [Test plan and results](./testing/TEST_PLAN.md) | Host suite passes; switching pending |
 | OPS-BUILD-001 | [Build and run](./operations/build.md) | Implemented |
@@ -44,11 +43,11 @@ log.
 
 ## Stage
 
-Control app implemented. `src/hubctl` runs the ANSI dashboard against the CMD
-port: identity, mode, per-channel power/data/voltage/current, and guarded
-VBUS/D+/D- switching. The host suite, the pty app test, the refactored lab-tool
-self-test, and a read-only on-target run pass. Real VBUS switching by the app
-is not yet run.
+Control app implemented. `src/hubctl` runs one USB Control page against the CMD
+port: identity, mode, per-port power/data/voltage/current, and guarded VBUS/D+/D-
+switching on the selected port. `m` opens a global menu with `Device`. The host
+suite, the pty app test, the refactored lab-tool self-test, and a read-only
+on-target run pass. Real VBUS switching by the app is not yet run.
 
 ## Reading order
 
@@ -58,7 +57,7 @@ is not yet run.
    still unknown, and the checks that close each unknown.
 3. [ARCH-001](./architecture/overview.md) — the control app layers, module
    boundaries and hardware contract.
-4. [UI-DASH-001](./ui/dashboard.md) — the one screen and its states.
+4. [UI-MENU-002](./ui/menu.md) — the page, the global menu and its states.
 5. [IF-PROTO-001](./contracts/protocols.md) — frames, commands and timing.
 6. [T-PLAN-001](./testing/TEST_PLAN.md) — what is proven, and what is not.
 7. Do not design control behaviour against an `UNK` line without either

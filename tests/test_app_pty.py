@@ -45,16 +45,27 @@ class AppPtyTests(unittest.TestCase):
                 output.extend(chunk)
 
         try:
-            deadline = time.time() + 4
-            while b"hubctl" not in output and time.time() < deadline:
-                drain(0.1)
-            self.assertIn(b"hubctl", bytes(output))
-            self.assertIn(b"CH4", bytes(output))
-            while b"live" not in output and time.time() < deadline:
-                drain(0.1)
+
+            def wait_for(needle, seconds=3):
+                start = len(output)
+                end = time.time() + seconds
+                while needle not in bytes(output[start:]) and time.time() < end:
+                    drain(0.1)
+                return needle in bytes(output[start:])
+
+            self.assertTrue(wait_for(b"HUBCTL"))
+            self.assertTrue(wait_for(b"USB PORT 4"))
+            self.assertTrue(wait_for(b"live"))
 
             os.write(master, b" ")
-            drain(0.7)
+            self.assertTrue(wait_for(b"USB1 on - echo ok, 0x00 on, 0x08 on"))
+
+            os.write(master, b"m")
+            self.assertTrue(wait_for(b"GLOBAL MENU"))
+
+            os.write(master, b"q")
+            self.assertTrue(wait_for(b"SPACE power"))
+
             os.write(master, b"q")
             drain(0.5)
             code = process.wait(timeout=3)
@@ -71,7 +82,8 @@ class AppPtyTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(b"\x1b[?1049h", bytes(output))
         self.assertIn(b"\x1b[?1049l", bytes(output))
-        self.assertIn(b"CH1 power on", bytes(output))
+        self.assertIn(b"USB1 on - echo ok", bytes(output))
+        self.assertIn(b"GLOBAL MENU", bytes(output))
         self.assertIn((0x01, 0x01, 1), hub.received)
 
     def test_no_device_state_and_quit(self):

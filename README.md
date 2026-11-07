@@ -9,8 +9,10 @@ Python standard library only. Linux and macOS. The vendor SDK under
 ## What it does
 
 - Finds the CMD port by `1a86:fe0c`; it never opens the DATA hub `1a86:8091`.
-- Shows identity, mode, and per-channel power, D+/D-, voltage and current.
-- Switches VBUS and D+/D- on one selected channel, then reads both states back.
+- Shows identity, mode, and per-port power, D+/D-, voltage and current on one
+  control page, one row per port.
+- Switches VBUS and D+/D- on the selected port, then reads both states back.
+- Opens a global menu with `m`; v1 has one entry, `Device`.
 - Shows LIVE / STALE / LOST; switching is disabled when the link is stale or the
   unit is in interlock mode.
 - Blocks NVM writes, reset, reboot, factory reset, interlock control and V3
@@ -39,14 +41,24 @@ hubctl
 
 ## Keys
 
-| Key | Action |
-| --- | --- |
-| `j` / `Down` | select next channel |
-| `k` / `Up` | select previous channel |
-| `Space` | toggle VBUS on the selected channel |
-| `d` | toggle D+/D- (only while that channel is powered) |
-| `r` | poll now; retry a lost link |
-| `q` / `Ctrl-C` | quit and restore the terminal |
+| Key | Control | Global menu | Device |
+| --- | --- | --- | --- |
+| `j` / `Down` | next port | - | - |
+| `k` / `Up` | previous port | - | - |
+| `Enter` | reserved, no action | open the item | back |
+| `Space` | toggle VBUS on the selected port | - | - |
+| `d` | toggle D+/D- (only while powered) | - | - |
+| `m` | open the menu | close | back to control |
+| `r` | poll now; retry a lost link | poll now | poll now |
+| `q` / `Esc` | quit | close | back |
+| `Ctrl-C` | quit and restore the terminal | quit | quit |
+
+`Space` and `d` are refused unless the link is LIVE, the mode is normal, and for
+`d` the port is powered. The reason appears on the `last` line.
+
+Enter never switches. Terminal autorepeat can repeat a held Enter, so the only
+write keys are `Space` and `d`, and the 0.4 s guard is per key. Enter on a port is
+reserved for a future port monitor and does nothing in v1.
 
 ## Flags
 
@@ -88,7 +100,7 @@ switching, unplug recovery and SIGTERM restore are not yet run on the unit.
 src/hubctl/                 terminal app
   hal/                      driver contract, discovery, registry
   devices/smartusbhub/      codec, transport, 4CH driver
-  app/                      controller, ANSI view, terminal layer, TUI
+  app/                      controller, menu model, ANSI view, terminal layer, TUI
 tests/                      host and pty tests
 scripts/lab_verify.py       hardware verification, shares the codec/transport
 docs/                       specification, architecture, protocol, tests, operations

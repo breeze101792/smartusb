@@ -38,6 +38,15 @@ def _same_identity(left: Identity, right: Identity) -> bool:
             and left.address == right.address)
 
 
+def _usb(port: int) -> str:
+    """The result-line abbreviation for USB PORT n."""
+    return f"USB{port}"
+
+
+def _link_lost(port: int, verb: str) -> str:
+    return f"{_usb(port)} {verb} - no reply, link lost"
+
+
 class Controller:
     """One device, one poll cycle, one request per tick.
 
@@ -311,30 +320,38 @@ class Controller:
             return
         current = self._channels.get(channel)
         if current is None or current.power is None:
-            self._note(f"CH{channel} power state unknown - no write", "warn")
+            self._note(
+                f"{_usb(channel)} power state unknown - no write", "warn")
             return
         target = not current.power
+        verb = "on" if target else "off"
+        failure = _link_lost(channel, verb)
         driver = self._driver
         try:
             driver.set_power([channel], target)
         except Rejected:
             self._status.mode = Mode.INTERLOCK
-            self._note("interlock mode - 0x01 rejected, switching disabled", "warn")
+            self._note("interlock - 0x01 rejected", "warn")
             return
-        except StateMismatch as exc:
-            self._note(f"CH{channel} power - echo differs, not applied ({exc})", "warn")
+        except StateMismatch:
+            self._note(f"{_usb(channel)} {verb} - echo differs, not applied",
+                       "warn")
             return
-        except (LinkError, Timeout) as exc:
-            self._mark_lost(str(exc))
+        except (LinkError, Timeout):
+            self._mark_lost(failure)
             return
 
         self._sleep(WRITE_SETTLE_S)
-        power = self._read_back(lambda: driver.read_power([channel]), channel)
+        power = self._read_back(lambda: driver.read_power([channel]), channel,
+                                failure)
         if self._driver is None:
             return
-        data = self._read_back(lambda: driver.read_data([channel]), channel)
+        data = self._read_back(lambda: driver.read_data([channel]), channel,
+                               failure)
+        if self._driver is None:
+            return
         if power is None:
-            self._note(f"CH{channel} power - readback timed out", "warn")
+            self._note(f"{_usb(channel)} {verb} - readback timed out", "warn")
             return
         raw_data = data
         stored = self._channels[channel]
@@ -344,15 +361,14 @@ class Controller:
             voltage_mv=stored.voltage_mv,
             current_ma=stored.current_ma,
         )
-        verb = "on" if target else "off"
         if power != target:
             self._note(
-                f"CH{channel} power {verb} - command sent, state differs "
+                f"{_usb(channel)} {verb} - state differs "
                 f"(0x00 {'on' if power else 'off'})", "warn")
         else:
             data_text = "?" if raw_data is None else ("on" if raw_data else "off")
             self._note(
-                f"CH{channel} power {verb} - echo ok, "
+                f"{_usb(channel)} {verb} - echo ok, "
                 f"0x00 {'on' if power else 'off'}, 0x08 {data_text}", "ok")
 
     def toggle_data(self, channel: int):
@@ -365,26 +381,36 @@ class Controller:
             return
         current = self._channels.get(channel)
         if current is None or current.power is not True:
-            self._note(f"CH{channel} data needs power on - key ignored", "warn")
+            self._note(
+                f"{_usb(channel)} data needs power - key ignored", "warn")
             return
         if current.data is None:
-            self._note(f"CH{channel} data state unknown - no write", "warn")
+            self._note(
+                f"{_usb(channel)} data state unknown - no write", "warn")
             return
         target = not current.data
+        verb = "on" if target else "off"
+        failure = _link_lost(channel, f"data {verb}")
         driver = self._driver
         try:
             driver.set_data([channel], target)
-        except StateMismatch as exc:
-            self._note(f"CH{channel} data - echo differs, not applied ({exc})", "warn")
+        except StateMismatch:
+            self._note(
+                f"{_usb(channel)} data {verb} - echo differs, not applied",
+                "warn")
             return
-        except (LinkError, Timeout) as exc:
-            self._mark_lost(str(exc))
+        except (LinkError, Timeout):
+            self._mark_lost(failure)
             return
 
         self._sleep(WRITE_SETTLE_S)
-        data = self._read_back(lambda: driver.read_data([channel]), channel)
+        data = self._read_back(lambda: driver.read_data([channel]), channel,
+                               failure)
+        if self._driver is None:
+            return
         if data is None:
-            self._note(f"CH{channel} data - readback timed out", "warn")
+            self._note(
+                f"{_usb(channel)} data {verb} - readback timed out", "warn")
             return
         stored = self._channels[channel]
         self._channels[channel] = ChannelReading(
@@ -393,23 +419,23 @@ class Controller:
             voltage_mv=stored.voltage_mv,
             current_ma=stored.current_ma,
         )
-        verb = "on" if target else "off"
         if data != target:
             self._note(
-                f"CH{channel} data {verb} - command sent, state differs "
+                f"{_usb(channel)} data {verb} - state differs "
                 f"(0x08 {'on' if data else 'off'})", "warn")
         else:
             self._note(
-                f"CH{channel} data {verb} - echo ok, 0x08 {'on' if data else 'off'}", "ok")
+                f"{_usb(channel)} data {verb} - echo ok, "
+                f"0x08 {'on' if data else 'off'}", "ok")
 
-    def _read_back(self, read, channel: int):
+    def _read_back(self, read, channel: int, failure: str):
         for attempt in range(2):
             try:
                 return read().get(channel)
             except Timeout:
                 if attempt == 1:
                     return None
-            except LinkError as exc:
-                self._mark_lost(str(exc))
+            except LinkError:
+                self._mark_lost(failure)
                 return None
         return None

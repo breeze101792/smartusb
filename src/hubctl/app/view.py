@@ -4,52 +4,102 @@ from __future__ import annotations
 
 import re
 
-from ..constants import SMALL_HEIGHT
-from ..hal.base import ChannelReading, LinkState, Mode, Snapshot
+from ..constants import (
+    BAR_LEFT_COL,
+    BAR_RIGHT_FROM_END,
+    BANNER_ROW,
+    CURRENT_COL,
+    CURRENT_WIDTH,
+    DATA_COL,
+    DATA_WIDTH,
+    DEVICE_BACK_ROW,
+    DEVICE_VALUE_COL,
+    LABEL_COL,
+    LABEL_WIDTH,
+    LAST_LABEL_COL,
+    LAST_ROW_FROM_END,
+    LAST_TEXT_COL,
+    LIST_ROW,
+    MENU_ITEM_ROW,
+    PID,
+    POWER_COL,
+    POWER_WIDTH,
+    RAIL_LEFT_COL,
+    RAIL_RIGHT_FROM_END,
+    STATUS_COL,
+    STATUS_ROW,
+    VID,
+    VOLTAGE_COL,
+    VOLTAGE_WIDTH,
+)
+from ..hal.base import LinkState, Mode, Snapshot
+from . import menu
 
 ESC = "\x1b["
 RESET = f"{ESC}0m"
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
-TEXT = 252
-DIM = 244
-ACCENT = 81
-OK = 78
-WARN = 220
-ERR = 203
-BORDER = 240
+C_OK = 78
+C_WARN = 220
+C_ERR = 203
+C_DIM = 244
+C_RAIL = 240
 
-COL_CH = 5
-COL_POWER = 8
-COL_DATA = 7
-COL_VBUS = 12
-COL_CURRENT = 9
+TOKENS = {
+    menu.TEXT: ("", None),
+    menu.DIM: ("2", C_DIM),
+    menu.OK: ("", C_OK),
+    menu.WARN: ("", C_WARN),
+    menu.ERR: ("", C_ERR),
+    menu.RAIL: ("", C_RAIL),
+}
 
-UTF8 = {"tl": "\u250c", "tr": "\u2510", "bl": "\u2514", "br": "\u2518",
-        "h": "\u2500", "v": "\u2502", "lt": "\u251c", "rt": "\u2524"}
-ASCII = {"tl": "+", "tr": "+", "bl": "+", "br": "+",
-         "h": "-", "v": "|", "lt": "+", "rt": "+"}
+PORT_CELLS = (
+    (LABEL_COL, LABEL_WIDTH),
+    (POWER_COL, POWER_WIDTH),
+    (DATA_COL, DATA_WIDTH),
+    (VOLTAGE_COL, VOLTAGE_WIDTH),
+    (CURRENT_COL, CURRENT_WIDTH),
+)
+
+TITLE_CONTROL = "HUBCTL  USB CONTROL"
+TITLE_DEVICE = "HUBCTL  DEVICE"
+LAST_LABEL = "last"
+INTERLOCK_BANNER = "! interlock - switching disabled. Hold CH1 3 s, then r."
+NO_DEVICE_WARN = "no SmartUSBHub CMD port"
+NO_DEVICE_HINT = "connect the CMD USB-C port, or pass --port /dev/ttyACM0."
+
+FOOTER_CONTROL = "SPACE power   d data   m menu   q quit"
+FOOTER_CONTROL_LOST = "SPACE power   d data   r retry   m menu   q quit"
+FOOTER_NO_DEVICE = "r retry   m menu   q quit"
+FOOTER_MENU = "ENTER open   m close   q close"
+FOOTER_DEVICE = "ENTER back   q back"
 
 
 class Style:
+    """Colour obeys NO_COLOR; bold, faint and reverse never do."""
+
     def __init__(self, enabled: bool):
         self.enabled = enabled
 
-    def __call__(self, text, color=None, bold=False, dim=False, rev=False):
-        if not self.enabled:
-            return text
+    def __call__(self, text, token=None, bold=False, rev=False):
+        attribute, colour = TOKENS.get(token, ("", None))
         codes = []
+        if attribute:
+            codes.append(attribute)
         if bold:
             codes.append("1")
-        if dim:
-            codes.append("2")
         if rev:
             codes.append("7")
-        if color is not None:
-            codes.append(f"38;5;{color}")
+        if colour is not None and self.enabled:
+            codes.append(f"38;5;{colour}")
         if not codes:
             return text
         return f"{ESC}{';'.join(codes)}m{text}{RESET}"
+
+
+def _plain(text, *_args, **_kwargs):
+    return text
 
 
 def vlen(text):
@@ -76,221 +126,259 @@ def pad(text, width):
     visible = vlen(text)
     if visible > width:
         text = clip(text, width)
+        if ESC in text:
+            text += RESET
         visible = width
     return text + " " * (width - visible)
 
 
-def cell(content, width):
-    return pad(content, width)
+def _inner(width):
+    return width - BAR_LEFT_COL - BAR_RIGHT_FROM_END + 1
 
 
-def _top(width, title, style, glyphs):
-    inner = width - 2
-    left = style(" hubctl ", ACCENT, bold=True)
-    right = style(f" {title} ", TEXT)
-    fill = max(1, inner - 2 - vlen(left) - vlen(right))
-    return (style(glyphs["tl"] + glyphs["h"], BORDER) + left
-            + style(glyphs["h"] * fill, BORDER) + right
-            + style(glyphs["h"] + glyphs["tr"], BORDER))
+def _indent(column):
+    return " " * (column - BAR_LEFT_COL)
 
 
-def _bottom(width, style, glyphs):
-    return style(glyphs["bl"] + glyphs["h"] * (width - 2) + glyphs["br"], BORDER)
+def _body(content, width, style, glyph):
+    return (" " * (RAIL_LEFT_COL - 1) + style(glyph, menu.RAIL)
+            + pad(content, _inner(width))
+            + style(glyph, menu.RAIL) + " " * RAIL_RIGHT_FROM_END)
 
 
-def _divider(width, style, glyphs):
-    return style(glyphs["lt"] + glyphs["h"] * (width - 2) + glyphs["rt"], BORDER)
+def _header(title, badge, token, width, style, glyph):
+    badge_text = clip(f" {badge} ", max(1, _inner(width) - 1))
+    room = _inner(width) - vlen(badge_text) - 1
+    title = clip(title, max(0, room))
+    fill = " " * max(0, room - vlen(title))
+    content = (style(title + fill, bold=True, rev=True)
+               + style(badge_text, token, bold=True)
+               + style(" ", bold=True, rev=True))
+    return (" " * (RAIL_LEFT_COL - 1) + style(glyph, menu.RAIL) + content
+            + style(glyph, menu.RAIL) + " " * RAIL_RIGHT_FROM_END)
 
 
-def _body(content, width, style, glyphs):
-    return style(glyphs["v"], BORDER) + pad(content, width - 2) + style(glyphs["v"], BORDER)
+def _footer(text, width, style, glyph):
+    bar = pad(text, _inner(width))
+    return _body(style(bar, bold=True, rev=True), width, style, glyph)
 
 
-def _assemble(body_lines, footer, width, height, title, style, glyphs):
-    inner = width - 2
-    slots = max(1, height - 2)
-    if len(body_lines) > slots - 1:
-        body_lines = body_lines[:slots - 1]
-    while len(body_lines) < slots - 1:
-        body_lines.append(_body("", width, style, glyphs))
-    body_lines.append(_body(footer, width, style, glyphs))
-    return ([_top(width, title, style, glyphs)] + body_lines
-            + [_bottom(width, style, glyphs)])
+def _row(cells, style):
+    """Lay cells out at their fixed columns, filling the gaps with spaces."""
+    out = []
+    column = LABEL_COL
+    for (target, width), (text, token, bold) in zip(PORT_CELLS, cells):
+        out.append(" " * (target - column))
+        out.append(style(pad(text, width), token, bold=bold))
+        column = target + width
+    return "".join(out)
 
 
-def _power_text(reading, unknown):
-    if unknown or reading.power is None:
-        return "?"
-    return "ON" if reading.power else "off"
-
-
-def _data_text(reading, unknown):
-    if unknown or reading.power is None:
-        return "?"
-    if reading.power is False:
-        return "-"
-    if reading.data is None:
-        return "?"
-    return "on" if reading.data else "off"
-
-
-def _voltage_text(reading, unknown):
-    if unknown or reading.voltage_mv is None:
-        return "?"
-    if reading.power is not True:
-        return f"({reading.voltage_mv} mV)"
-    return f"{reading.voltage_mv / 1000:.2f} V"
-
-
-def _current_text(reading, unknown):
-    if unknown or reading.current_ma is None:
-        return "?"
-    return f"{reading.current_ma / 1000:.2f} A"
-
-
-def _row(number, reading, selected, stale, unknown, width, style):
-    marker = "> " if selected else "  "
-    power = _power_text(reading, unknown)
-    data = _data_text(reading, unknown)
-    volts = _voltage_text(reading, unknown)
-    current = _current_text(reading, unknown)
-    plain = (marker
-             + cell(f"CH{number}", COL_CH)
-             + cell(power, COL_POWER)
-             + cell(data, COL_DATA)
-             + cell(volts, COL_VBUS)
-             + cell(current, COL_CURRENT))
-    if selected:
-        return style(pad(" " + plain, width - 2), rev=True)
-    if stale or unknown:
-        return style(pad(" " + plain, width - 2), dim=True)
-    power_cell = cell(
-        style("ON", OK, bold=True) if reading.power is True
-        else style("off", DIM), COL_POWER)
-    data_cell = cell(style(data, DIM if data in ("-", "?") else None), COL_DATA)
-    volt_cell = cell(style(volts, DIM if reading.power is not True else None), COL_VBUS)
-    return (" " + marker + cell(f"CH{number}", COL_CH)
-            + power_cell + data_cell + volt_cell + cell(current, COL_CURRENT))
-
-
-def _link_text(snapshot, style):
-    if snapshot.link == LinkState.LIVE:
-        return style("live", OK)
+def _port_row(snapshot, number, selected, style):
+    values = menu.readout(snapshot, number)
     if snapshot.link == LinkState.STALE:
-        return style(f"stale {snapshot.last_cycle_age_s:.1f} s", WARN)
-    if snapshot.reconnect_in_s is not None:
-        return style(f"lost - reconnect in {snapshot.reconnect_in_s:.0f} s", ERR)
-    return style("lost", ERR)
+        tokens = (menu.DIM,) * 4
+    else:
+        tokens = (
+            menu.OK if values.power_on else menu.DIM,
+            menu.OK if values.data_on else menu.DIM,
+            menu.TEXT if values.voltage_live else menu.DIM,
+            menu.TEXT if values.current_live else menu.DIM,
+        )
+    cells = (
+        (menu.port_label(number), menu.TEXT, True),
+        (values.power_text, tokens[0], False),
+        (values.data_text, tokens[1], False),
+        (values.voltage_text, tokens[2], False),
+        (values.current_text, tokens[3], False),
+    )
+    if selected:
+        return (_indent(LABEL_COL)
+                + style(_row(cells, _plain), bold=True, rev=True))
+    return _indent(LABEL_COL) + _row(cells, style)
 
 
-def _mode_text(snapshot, style):
-    if snapshot.status.mode == Mode.INTERLOCK:
-        return style("interlock", WARN)
-    if snapshot.status.mode == Mode.UNKNOWN:
-        return style("unknown", WARN)
-    return "normal"
+def _item_row(item, selected, style):
+    if selected:
+        return (_indent(LABEL_COL)
+                + style(item.label + " ", bold=True, rev=True))
+    return (_indent(LABEL_COL)
+            + style(pad(item.label, LABEL_WIDTH), menu.TEXT, bold=True))
 
 
-def _footer(snapshot, style):
-    if snapshot.link == LinkState.LOST:
-        return (style(" q", TEXT, bold=True) + style(" quit   ", DIM)
-                + style("r", TEXT, bold=True) + style(" retry now", DIM))
-    live = (snapshot.link == LinkState.LIVE
-            and snapshot.status.mode == Mode.NORMAL)
-    parts = [
-        ("j/k", "select", True),
-        ("space", "power", live),
-        ("d", "data", live),
-        ("r", "refresh", True),
-        ("q", "quit", True),
-    ]
-    line = " "
-    for key, label, enabled in parts:
-        shown = label if enabled else "-"
-        line += style(key, TEXT, bold=True) if enabled else style(key, DIM)
-        line += style(f" {shown}   ", DIM)
-    return line.rstrip()
+def _field_row(label, value, known, style):
+    token = menu.TEXT if known else menu.DIM
+    return (_indent(LABEL_COL)
+            + style(pad(label, DEVICE_VALUE_COL - LABEL_COL), menu.TEXT,
+                    bold=True)
+            + style(value, token))
 
 
-def _no_device(snapshot, width, height, style, glyphs):
-    lines = [
-        _body("", width, style, glyphs),
-        _body(" " + style("no SmartUSBHub CMD port", WARN, bold=True),
-              width, style, glyphs),
-        _body("", width, style, glyphs),
-        _body(" " + (snapshot.last_error or snapshot.last_action),
-              width, style, glyphs),
-        _body("", width, style, glyphs),
-        _body(" connect the CMD USB-C port with a data cable,", width, style, glyphs),
-        _body(" or pass --port /dev/ttyACM0.", width, style, glyphs),
-    ]
-    return _assemble(lines, _footer(snapshot, style), width, height,
-                     "no device", style, glyphs)
+def _link(snapshot):
+    if snapshot.link == LinkState.LIVE:
+        return "live", menu.OK
+    if snapshot.link == LinkState.STALE:
+        return f"stale {snapshot.last_cycle_age_s:.1f} s", menu.WARN
+    return "lost", menu.ERR
 
 
-def render(snapshot: Snapshot, selected: int, width: int, height: int,
-           color: bool = True, utf8: bool = True):
-    """Return exactly ``height`` lines of at most ``width`` visible columns."""
-    style = Style(color)
-    glyphs = UTF8 if utf8 else ASCII
+def _badge(snapshot):
     if snapshot.identity is None:
-        return _no_device(snapshot, width, height, style, glyphs)
-
-    identity = snapshot.identity
-    count = max(1, identity.channels)
-    selected = max(0, min(selected, count - 1))
-    inner = width - 2
-    stale = snapshot.link == LinkState.STALE
-    unknown = snapshot.link == LinkState.LOST
-
-    lines = []
-    left = style("hubctl", ACCENT, bold=True) + " - " + identity.product
-    right = style(f"FW {identity.firmware}  HW {identity.hardware} ", DIM)
-    gap = max(1, inner - 1 - vlen(left) - vlen(right))
-    lines.append(_body(" " + left + " " * gap + right, width, style, glyphs))
-
-    line = (" " + style(f"{identity.port}  1a86:fe0c  ", DIM)
-            + _mode_text(snapshot, style) + "  " + _link_text(snapshot, style)
-            + style(f"  poll {snapshot.poll_interval_s:.1f} s", DIM))
-    lines.append(_body(line, width, style, glyphs))
-    lines.append(_divider(width, style, glyphs))
-
+        return "no device", menu.WARN
     if snapshot.status.mode == Mode.INTERLOCK:
-        lines.append(_body(" " + style(
-            "! interlock - switching disabled. Hold CH1 3 s, then r.",
-            WARN), width, style, glyphs))
-        lines.append(_divider(width, style, glyphs))
+        return "interlock", menu.WARN
+    if snapshot.link == LinkState.LOST:
+        if snapshot.reconnect_in_s is None:
+            return "lost", menu.ERR
+        return f"lost - retry {snapshot.reconnect_in_s:.0f} s", menu.ERR
+    return _link(snapshot)
 
-    header = ("   " + cell("CH", COL_CH) + cell("POWER", COL_POWER)
-              + cell("DATA", COL_DATA) + cell("VBUS", COL_VBUS) + "CURRENT")
-    lines.append(_body(style(header, DIM), width, style, glyphs))
 
-    for index in range(count):
-        number = index + 1
-        reading = snapshot.channels.get(number, ChannelReading())
-        lines.append(_body(
-            _row(number, reading, index == selected, stale, unknown, width, style),
-            width, style, glyphs))
-    lines.append(_divider(width, style, glyphs))
+def _retry(snapshot):
+    if snapshot.reconnect_in_s is None:
+        return "?"
+    return f"{snapshot.reconnect_in_s:.0f} s"
 
-    if height >= SMALL_HEIGHT:
-        buttons = ("?" if snapshot.status.buttons_enabled is None
-                   else "enabled" if snapshot.status.buttons_enabled else "disabled")
-        restore = ("?" if snapshot.status.restore_enabled is None
-                   else "enabled" if snapshot.status.restore_enabled else "disabled")
-        lines.append(_body(
-            " " + style("device    ", DIM)
-            + f"{identity.product}  {count} channels  addr 0x{identity.address:04X}",
-            width, style, glyphs))
-        lines.append(_body(
-            " " + style("settings  ", DIM)
-            + f"buttons {buttons}  restore {restore}",
-            width, style, glyphs))
 
-    kind_color = {"ok": OK, "warn": WARN, "err": ERR}.get(snapshot.last_kind)
-    lines.append(_body(
-        " " + style("last      ", DIM) + style(snapshot.last_action, kind_color),
-        width, style, glyphs))
+def _mode(snapshot):
+    if snapshot.status.mode == Mode.INTERLOCK:
+        return "interlock", menu.WARN
+    if snapshot.status.mode == Mode.UNKNOWN:
+        return "unknown", menu.WARN
+    return "normal", menu.TEXT
 
-    return _assemble(lines, _footer(snapshot, style), width, height,
-                     identity.product, style, glyphs)
+
+def _port(snapshot):
+    return "?" if snapshot.identity is None else snapshot.identity.port
+
+
+def _main_status(snapshot, style):
+    mode, mode_token = _mode(snapshot)
+    link, link_token = _link(snapshot)
+    return (_indent(STATUS_COL) + style("port ", menu.DIM)
+            + style(_port(snapshot), menu.TEXT)
+            + "   " + style(mode, mode_token)
+            + "   " + style(link, link_token)
+            + "   " + style(f"poll {snapshot.poll_interval_s:.1f} s", menu.DIM))
+
+
+def _discovery_status(snapshot, style):
+    return (_indent(STATUS_COL) + style("discovery ", menu.DIM)
+            + style(f"{VID}:{PID}", menu.TEXT)
+            + "   " + style("no port", menu.WARN)
+            + "   " + style(f"retry {_retry(snapshot)}", menu.DIM))
+
+
+def _status_row(snapshot, style):
+    if snapshot.identity is None:
+        return _discovery_status(snapshot, style)
+    return _main_status(snapshot, style)
+
+
+def _device_status(snapshot, style):
+    link, link_token = _link(snapshot)
+    return (_indent(STATUS_COL) + style("port ", menu.DIM)
+            + style(_port(snapshot), menu.TEXT)
+            + "   " + style(f"{VID}:{PID}", menu.TEXT)
+            + "   " + style(link, link_token))
+
+
+def _last_row(snapshot, style):
+    token = (snapshot.last_kind
+             if snapshot.last_kind in (menu.OK, menu.WARN, menu.ERR)
+             else menu.TEXT)
+    return (_indent(LAST_LABEL_COL)
+            + pad(style(LAST_LABEL, menu.DIM), LAST_TEXT_COL - LAST_LABEL_COL)
+            + style(snapshot.last_action, token))
+
+
+def _banner_row(snapshot, style):
+    if snapshot.status.mode != Mode.INTERLOCK:
+        return None
+    return _indent(LABEL_COL) + style(INTERLOCK_BANNER, menu.WARN)
+
+
+def _control_rows(snapshot, state, style):
+    rows = {STATUS_ROW: _status_row(snapshot, style)}
+    if snapshot.identity is None:
+        rows[LIST_ROW] = _indent(LABEL_COL) + style(NO_DEVICE_WARN, menu.WARN)
+        rows[LIST_ROW + 1] = (_indent(LABEL_COL)
+                              + style(NO_DEVICE_HINT, menu.DIM))
+        return rows
+    banner = _banner_row(snapshot, style)
+    if banner is not None:
+        rows[BANNER_ROW] = banner
+    selected = menu.index(snapshot, state)
+    for offset in range(menu.port_count(snapshot)):
+        rows[LIST_ROW + offset] = _port_row(snapshot, offset + 1,
+                                            offset == selected, style)
+    return rows
+
+
+def _menu_rows(snapshot, state, style):
+    rows = {STATUS_ROW: _status_row(snapshot, style)}
+    banner = _banner_row(snapshot, style)
+    if banner is not None:
+        rows[BANNER_ROW] = banner
+    rows[LIST_ROW] = _indent(LABEL_COL) + style(menu.MENU_HEADING, menu.DIM)
+    selected = menu.index(snapshot, state)
+    for offset, item in enumerate(menu.items(state)):
+        rows[MENU_ITEM_ROW + offset] = _item_row(item, offset == selected,
+                                                 style)
+    return rows
+
+
+def _device_rows(snapshot, state, style):
+    rows = {STATUS_ROW: _device_status(snapshot, style)}
+    for offset, (label, value, known) in enumerate(
+            menu.device_fields(snapshot)):
+        rows[LIST_ROW + offset] = _field_row(label, value, known, style)
+    entries = menu.items(state)
+    rows[DEVICE_BACK_ROW] = _item_row(entries[0], True, style)
+    return rows
+
+
+def _screen_rows(snapshot, state, style):
+    if state.screen == menu.MENU:
+        return _menu_rows(snapshot, state, style)
+    if state.screen == menu.DEVICE:
+        return _device_rows(snapshot, state, style)
+    return _control_rows(snapshot, state, style)
+
+
+def _heading(state):
+    if state.screen == menu.DEVICE:
+        return TITLE_DEVICE
+    return TITLE_CONTROL
+
+
+def _footer_text(snapshot, state):
+    if state.screen == menu.DEVICE:
+        return FOOTER_DEVICE
+    if state.screen == menu.MENU:
+        return FOOTER_MENU
+    if snapshot.identity is None:
+        return FOOTER_NO_DEVICE
+    if snapshot.link == LinkState.LOST:
+        return FOOTER_CONTROL_LOST
+    return FOOTER_CONTROL
+
+
+def render(snapshot: Snapshot, state: menu.State, width: int, height: int,
+           color: bool = True, utf8: bool = True):
+    """Return exactly ``height`` lines of exactly ``width`` visible columns."""
+    style = Style(color)
+    glyph = "\u2502" if utf8 else "|"
+    if height <= 0:
+        return []
+    badge, token = _badge(snapshot)
+    lines = [_header(_heading(state), badge, token, width, style, glyph)]
+    if height >= 2:
+        rows = _screen_rows(snapshot, state, style)
+        if snapshot.identity is not None:
+            rows[height - LAST_ROW_FROM_END] = _last_row(snapshot, style)
+        body = [rows.get(row, "") for row in range(2, height)]
+        lines.extend(_body(content, width, style, glyph) for content in body)
+        lines.append(_footer(_footer_text(snapshot, state), width, style,
+                             glyph))
+    return lines

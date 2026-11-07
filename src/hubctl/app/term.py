@@ -81,7 +81,10 @@ class Terminal:
                 sequence += os.read(self.in_fd, 1)
                 if len(sequence) >= 2:
                     break
-            return {b"[A": "up", b"[B": "down",
-                    b"[C": "right", b"[D": "left"}.get(sequence, "escape")
+            keys = {b"[A": "up", b"[B": "down",
+                    b"[C": "right", b"[D": "left"}
+            if sequence in keys:
+                return keys[sequence]
+            return "escape" if sequence == b"" else "ignore"
         char = raw.decode("latin1")
         return {" ": "space", "\x03": "ctrl-c", "\r": "enter", "\n": "enter"}.get(char, char)

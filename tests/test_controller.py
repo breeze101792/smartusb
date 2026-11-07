@@ -8,6 +8,7 @@ from hubctl.hal.base import (
     LinkState,
     Mode,
     Rejected,
+    StateMismatch,
     Status,
     Timeout,
 )
@@ -43,7 +44,9 @@ class FakeDriver(DeviceDriver):
         self.closed = False
         self.fail_reads = False
         self.raise_link = False
+        self.read_data_link = False
         self.old_readback = False
+        self.bad_echo = False
         self.reject = False
         self.set_power_calls = []
         self.set_data_calls = []
@@ -71,7 +74,7 @@ class FakeDriver(DeviceDriver):
         return {channel: self.power[channel] for channel in channels}
 
     def read_data(self, channels):
-        if self.raise_link:
+        if self.raise_link or self.read_data_link:
             raise LinkError("unplugged")
         return {channel: self.data[channel] for channel in channels}
 
@@ -83,8 +86,12 @@ class FakeDriver(DeviceDriver):
 
     def set_power(self, channels, on):
         self.set_power_calls.append((tuple(channels), on))
+        if self.raise_link:
+            raise LinkError("unplugged")
         if self.reject:
             raise Rejected("interlock")
+        if self.bad_echo:
+            raise StateMismatch("echo")
         for channel in channels:
             self.power[channel] = on
         if self.old_readback:
@@ -93,6 +100,8 @@ class FakeDriver(DeviceDriver):
 
     def set_data(self, channels, on):
         self.set_data_calls.append((tuple(channels), on))
+        if self.bad_echo:
+            raise StateMismatch("echo")
         for channel in channels:
             self.data[channel] = on
 
@@ -181,7 +190,8 @@ class ControllerTests(unittest.TestCase):
         self.clock.advance(0.1)
         self.controller.toggle_data(1)
         snapshot = self.controller.snapshot()
-        self.assertIn("needs power on", snapshot.last_action)
+        self.assertEqual(snapshot.last_action,
+                         "USB1 data needs power - key ignored")
         self.assertEqual(self.driver.set_data_calls, [])
 
     def test_no_device_retries_with_backoff(self):
@@ -225,6 +235,111 @@ class ControllerTests(unittest.TestCase):
         run_cycle(self.controller, self.clock)
         self.assertEqual(self.controller.snapshot().link, LinkState.LIVE)
         self.assertEqual(same.set_power_calls, [])
+
+
+class ResultStringTests(unittest.TestCase):
+    """Every result line of docs/ui/menu.md section 6."""
+
+    def setUp(self):
+        self.clock = Clock()
+        self.driver = FakeDriver()
+        self.controller = Controller(
+            open_fn=lambda: self.driver,
+            clock=self.clock,
+            sleep=self.clock.sleep)
+        run_cycle(self.controller, self.clock)
+        self.clock.advance(0.1)
+
+    def tearDown(self):
+        self.controller.close()
+
+    def note(self):
+        return self.controller.snapshot().last_action
+
+    def power_on(self, channel):
+        self.driver.power[channel] = True
+
+    def poll_again(self):
+        self.clock.advance(1.1)
+        run_cycle(self.controller, self.clock)
+        self.clock.advance(0.1)
+
+    def test_power_on_verified(self):
+        self.controller.toggle_power(2)
+        self.assertEqual(self.note(),
+                         "USB2 on - echo ok, 0x00 on, 0x08 on")
+
+    def test_power_off_verified(self):
+        self.power_on(2)
+        self.driver.data[2] = False
+        self.poll_again()
+        self.controller.toggle_power(2)
+        self.assertEqual(self.note(),
+                         "USB2 off - echo ok, 0x00 off, 0x08 off")
+
+    def test_data_on_verified(self):
+        self.power_on(2)
+        self.driver.data[2] = False
+        self.poll_again()
+        self.controller.toggle_data(2)
+        self.assertEqual(self.note(), "USB2 data on - echo ok, 0x08 on")
+
+    def test_data_off_verified(self):
+        self.power_on(2)
+        self.poll_again()
+        self.controller.toggle_data(2)
+        self.assertEqual(self.note(), "USB2 data off - echo ok, 0x08 off")
+
+    def test_echo_mismatch(self):
+        self.power_on(2)
+        self.poll_again()
+        self.driver.bad_echo = True
+        self.controller.toggle_power(2)
+        self.assertEqual(self.note(), "USB2 off - echo differs, not applied")
+
+    def test_readback_mismatch(self):
+        self.power_on(2)
+        self.poll_again()
+        self.driver.old_readback = True
+        self.controller.toggle_power(2)
+        self.assertEqual(self.note(), "USB2 off - state differs (0x00 on)")
+
+    def test_rejection(self):
+        self.driver.reject = True
+        self.controller.toggle_power(2)
+        self.assertEqual(self.note(), "interlock - 0x01 rejected")
+
+    def test_link_failure_names_the_port_and_the_verb(self):
+        self.power_on(2)
+        self.poll_again()
+        self.driver.raise_link = True
+        self.controller.toggle_power(2)
+        self.assertEqual(self.note(), "USB2 off - no reply, link lost")
+        self.assertEqual(self.controller.snapshot().link, LinkState.LOST)
+
+    def test_link_loss_during_the_power_readback_keeps_the_link_text(self):
+        self.power_on(2)
+        self.poll_again()
+        self.driver.read_data_link = True
+        self.controller.toggle_power(2)
+        snapshot = self.controller.snapshot()
+        self.assertEqual(snapshot.last_action,
+                         "USB2 off - no reply, link lost")
+        self.assertEqual(snapshot.last_kind, "err")
+        self.assertEqual(snapshot.link, LinkState.LOST)
+
+    def test_link_loss_during_the_data_readback_is_not_a_timeout(self):
+        self.power_on(2)
+        self.poll_again()
+        self.driver.read_data_link = True
+        self.controller.toggle_data(2)
+        self.assertEqual(self.note(), "USB2 data off - no reply, link lost")
+        self.assertEqual(self.controller.snapshot().link, LinkState.LOST)
+
+    def test_data_while_off(self):
+        self.controller.toggle_data(2)
+        self.assertEqual(self.note(),
+                         "USB2 data needs power - key ignored")
 
 
 if __name__ == "__main__":

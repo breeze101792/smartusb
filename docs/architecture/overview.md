@@ -10,7 +10,7 @@
 
 ## 1. Decision
 
-One process, one screen, four layers:
+One process, one page, four layers:
 
 ```
 TUI (raw ANSI)  ->  Controller  ->  DeviceDriver (HAL)  ->  4CH driver  ->  codec + transport
@@ -37,7 +37,7 @@ TUI (raw ANSI)  ->  Controller  ->  DeviceDriver (HAL)  ->  4CH driver  ->  code
 
 | Layer | Files | Responsibility | Must not |
 | --- | --- | --- | --- |
-| CLI / TUI | `cli.py`, `app/tui.py`, `app/view.py`, `app/term.py` | arguments, terminal lifecycle, keys, pure ANSI rendering | speak protocol, open a port |
+| CLI / TUI | `cli.py`, `app/tui.py`, `app/menu.py`, `app/view.py`, `app/term.py` | arguments, terminal lifecycle, keys, menu state, pure ANSI rendering | speak protocol, open a port |
 | Controller | `app/controller.py` | tick schedule, poll cycle, write verification, staleness, reconnect | format text, build frames |
 | HAL | `hal/base.py`, `hal/registry.py` | types, `DeviceDriver` ABC, error taxonomy, driver list | know termios or ANSI |
 | Discovery | `hal/discovery.py` | enumerate candidate endpoints per platform | open or write a port |
@@ -48,7 +48,8 @@ Dependency direction is acyclic:
 
 ```
 cli -> tui -> controller -> hal.base
-          tui -> view -> hal.base (types only)
+          tui -> menu -> hal.base (types only)
+          tui -> view -> menu, hal.base (types only)
           tui -> term
        controller -> hal.registry -> driver -> protocol + transport
 ```
@@ -64,9 +65,10 @@ cli -> tui -> controller -> hal.base
 | `devices/smartusbhub/transport.py` | fd, exclusive lock, allow-list | `SerialLink(port)`, `request`, `write`, `close` | `protocol`, stdlib |
 | `devices/smartusbhub/driver.py` | device semantics and state | `DeviceDriver` methods | `hal.base`, `protocol`, `transport` |
 | `app/controller.py` | session state and policy | `Controller` methods, `snapshot()` | `hal.base`, `hal.registry` |
-| `app/view.py` | ANSI text layout | `render(snapshot, selected, width, height) -> list[str]` | `hal.base` types |
+| `app/menu.py` | page and menu state, item lists, key routing | `State`, `Action`, `items()`, `index()`, `handle_key()`, `readout()`, `device_fields()` | `hal.base` types |
+| `app/view.py` | ANSI text layout | `render(snapshot, state, width, height) -> list[str]` | `menu`, `hal.base` types |
 | `app/term.py` | raw mode, alternate screen, size, key decode, frame write | `Terminal`, `read_key()`, `draw()` | stdlib |
-| `app/tui.py` | loop and input handling | `run(controller)` | `term`, `view`, `controller` |
+| `app/tui.py` | loop and input handling | `run(controller)` | `term`, `view`, `menu`, `controller` |
 | `cli.py` | arguments, exit codes | `main(argv) -> int` | everything above |
 
 Per-module PROVIDES/REQUIRES contracts with pre/postconditions, error tables and
@@ -160,7 +162,7 @@ query is a link failure, not a missing feature (`HW-C-003`).
 ```
 every 50 ms
   key = read_key(select timeout 50 ms)      # raw fd, ESC [ A/B decoded
-  if key:            dispatch (selection is local; a toggle runs the write path)
+  if key:            route through menu.handle_key(); a toggle runs the write path
   else:              issue one request from the poll cycle
   if snapshot changed or the size changed: draw()
 ```
@@ -195,9 +197,9 @@ Timing constants, all named:
 
 ## 6. Write path
 
-`Space` or `d` runs this sequence synchronously:
+`Space` or `d` on the control page runs this sequence synchronously:
 
-1. Guard: link LIVE, mode NORMAL, selected channel known, and for `d` power is
+1. Guard: link LIVE, mode NORMAL, selected port known, and for `d` power is
    `ON`.
 2. Transport checks the command against its allow-list.
 3. Send `0x01` (power) or `0x05` (data) with a mask built from the channel.
@@ -269,11 +271,14 @@ downstream sysfs device map, non-interactive CLI output, mouse.
 | Claim | Method | Result |
 | --- | --- | --- |
 | Codec matches documented and captured frames | vector tests, bad checksum resync, truncation | host — 8 pass |
-| Driver: identity, masks, reads, writes, rejection, silence, allow-list | pty fake device | host — 9 pass |
-| Controller: poll schedule, write verify, staleness, reconnect without replay | fake driver, injectable clock | host — 9 pass |
-| Render: states, width/height bounds, monochrome | pure `render()` assertions | host — 10 pass |
+| Driver: identity, masks, reads, writes, rejection, silence, allow-list | pty fake device | host — 10 pass |
+| Controller: poll schedule, write verify, staleness, reconnect without replay, result strings | fake driver, injectable clock | host — 20 pass |
+| Menu model: port list, global menu, Device, Enter never writes, key routing, guarded keys | pure `menu` assertions | host — 28 pass |
+| Render: frame, states, width/height sweep, clipping, selection without colour, nine mockup frames | pure `render()` assertions | host — 32 pass |
+| TUI loop: `m` opens and closes, Enter opens Device, per-key repeat guard, quit | fake controller, terminal and clock | host — 16 pass |
 | Discovery filters `fe0c` and rejects `8091` | fake sysfs tree | host — 2 pass |
-| App starts, switches CH1, quits, restores the screen | real app process in a pty | host — 1 pass |
+| Key decode: arrows, lone Esc, unknown sequences ignored, plain keys | raw pipe fd | host — 4 pass |
+| App starts, toggles a port, opens the menu, quits, restores the screen | real app process in a pty | host — 2 pass |
 | Identity, mode, channel reads on the unit | app read-only run, raw trace | on target — pass |
 | Lab tool after the shared-codec refactor | `--self-test`; default read-only run | 20/20; 12/12 |
 | Real VBUS switching | toggle a free channel, read both states | **pending explicit approval** |
