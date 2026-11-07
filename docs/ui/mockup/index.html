@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hubctl - UI design: window concept and ASCII rendering</title>
+<style>
+  :root {
+    --bg: #07080b;
+    --panel: #0c0f15;
+    --term: #0b0e14;
+    --bar: #12161e;
+    --line: #1c2230;
+    --text: #c9d1d9;
+    --dim: #7c8798;
+    --faint: #343b49;
+    --accent: #56d4dd;
+    --ok: #56d364;
+    --warn: #e3b341;
+    --err: #f85149;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    color: var(--text);
+    background: radial-gradient(1100px 560px at 50% -220px, #111a29 0%, var(--bg) 62%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1000px; margin: 0 auto; padding: 56px 24px 96px; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  h1 { margin: 14px 0 10px; font-size: 32px; line-height: 1.15; letter-spacing: -.02em; }
+  .lede { margin: 0; max-width: 76ch; color: var(--dim); font-size: 15px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 0; }
+  .chip { font: 12px/1 var(--mono); color: var(--dim); border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 10px; }
+  nav { display: flex; flex-wrap: wrap; gap: 18px; margin: 34px 0 8px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  nav a { color: var(--dim); text-decoration: none; font: 12px/1 var(--mono); }
+  nav a:hover { color: var(--text); }
+  section.block { margin: 58px 0 0; }
+  h2.block-title { margin: 0 0 6px; font-size: 22px; letter-spacing: -.01em; }
+  .sub { margin: 0 0 18px; color: var(--dim); font-size: 14px; max-width: 80ch; }
+  h3 { margin: 0 0 4px; font-size: 14px; }
+
+  /* --- window concept --------------------------------------------------- */
+  .stage { position: relative; margin-top: 20px; }
+  .stage > input { position: absolute; opacity: 0; pointer-events: none; }
+  .win {
+    border: 1px solid #2a3140;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0e1218;
+    box-shadow: 0 32px 90px rgba(0, 0, 0, .62);
+  }
+  .titlebar {
+    height: 38px; display: flex; align-items: center; padding: 0 14px;
+    background: #151a23; border-bottom: 1px solid #232a38;
+  }
+  .lights { display: flex; gap: 7px; width: 70px; }
+  .light { width: 11px; height: 11px; border-radius: 50%; }
+  .light.r { background: #ff5f57; }
+  .light.y { background: #febc2e; }
+  .light.g { background: #28c840; }
+  .wintitle { flex: 1; text-align: center; font-size: 12px; color: #8b96a5; letter-spacing: .01em; }
+  .winactions { width: 70px; text-align: right; color: #4a5464; font-size: 12px; letter-spacing: 3px; }
+  .toolbar {
+    display: flex; align-items: center; gap: 16px; padding: 10px 14px;
+    border-bottom: 1px solid #1c2230; background: #10151d;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+  .logo {
+    width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center;
+    background: rgba(86, 212, 221, .14); color: var(--accent);
+    font: 700 11px/1 var(--mono);
+  }
+  .tabs { display: flex; gap: 3px; margin-left: auto; padding: 3px; background: #0b0e14; border: 1px solid #1c2230; border-radius: 7px; }
+  .tabs label { padding: 6px 10px; border-radius: 5px; font: 11.5px/1 var(--mono); color: var(--dim); cursor: pointer; }
+  .tabs label:hover { color: var(--text); }
+  .winmeta { margin-left: 4px; font: 11px/1 var(--mono); color: #566070; }
+  .content { min-height: 300px; }
+  .content .pane { display: none; padding: 18px 20px 16px; }
+  #s-live:checked ~ .win .pane-live,
+  #s-interlock:checked ~ .win .pane-interlock,
+  #s-stale:checked ~ .win .pane-stale,
+  #s-lost:checked ~ .win .pane-lost { display: block; }
+  #s-live:checked ~ .win label[for="s-live"],
+  #s-interlock:checked ~ .win label[for="s-interlock"],
+  #s-stale:checked ~ .win label[for="s-stale"],
+  #s-lost:checked ~ .win label[for="s-lost"] { background: #1e2735; color: var(--text); }
+
+  .strip { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 12px; color: var(--dim); }
+  .strip .spacer { flex: 1; }
+  .strip .mono { font-family: var(--mono); font-size: 11.5px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 5px; font: 600 10.5px/1 var(--mono); letter-spacing: .04em; }
+  .badge.ok { color: var(--ok); background: rgba(86, 211, 100, .11); }
+  .badge.warn { color: var(--warn); background: rgba(227, 179, 65, .11); }
+  .badge.err { color: var(--err); background: rgba(248, 81, 73, .11); }
+  .notice {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 14px; padding: 10px 12px; border-radius: 7px;
+    font-size: 12.5px; line-height: 1.45;
+  }
+  .notice.warn { color: #e3b341; background: rgba(227, 179, 65, .08); border: 1px solid rgba(227, 179, 65, .24); }
+  .notice.err { color: #f85149; background: rgba(248, 81, 73, .08); border: 1px solid rgba(248, 81, 73, .24); }
+  .notice b { font-weight: 600; }
+
+  .channels { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  .channels th {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid #1c2230;
+    font: 600 10.5px/1 var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase;
+  }
+  .channels td { padding: 10px; border-bottom: 1px solid #161b25; color: #b9c2ce; }
+  .channels td.ch { font: 600 12.5px/1 var(--mono); color: var(--text); }
+  .channels td.num { font-family: var(--mono); text-align: right; color: var(--text); }
+  .channels th:nth-child(4), .channels th:nth-child(5) { text-align: right; }
+  .channels td.muted { color: #566070; }
+  .channels tr.selected td { background: rgba(86, 212, 221, .09); }
+  .channels tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+  .channels tr.selected td.ch { color: var(--accent); }
+  .channels.dim td { color: #5f6a79; }
+  .pill { display: inline-block; padding: 4px 7px; border-radius: 5px; font: 600 10.5px/1 var(--mono); letter-spacing: .04em; }
+  .pill.on { color: var(--ok); background: rgba(86, 211, 100, .13); }
+  .pill.off { color: var(--dim); background: rgba(124, 135, 152, .12); }
+  .pill.unknown { color: var(--err); background: rgba(248, 81, 73, .10); }
+
+  .meta { display: grid; gap: 5px; margin-top: 14px; font-size: 12.5px; color: #aab4c0; }
+  .meta .label { display: inline-block; width: 76px; font: 600 10.5px/1 var(--mono); letter-spacing: .07em; color: var(--dim); }
+  .statusbar {
+    display: flex; justify-content: space-between; gap: 16px;
+    padding: 9px 16px; border-top: 1px solid #1c2230; background: #0b0e14;
+    font: 11.5px/1.4 var(--mono); color: var(--dim);
+  }
+  .statusbar b { color: var(--text); font-weight: 600; }
+
+  /* --- ascii rendering -------------------------------------------------- */
+  .term { background: var(--term); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.5); width: fit-content; max-width: 100%; margin: 0 auto; }
+  .term-bar { display: flex; align-items: center; gap: 7px; padding: 9px 12px; background: var(--bar); border-bottom: 1px solid var(--line); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #2a3140; }
+  .term-title { margin-left: 8px; font: 11.5px/1 var(--mono); color: var(--dim); }
+  .term-body { padding: 16px 18px 18px; overflow-x: auto; font-family: var(--mono); font-size: clamp(9.5px, 1.38vw, 13px); line-height: 1.5; }
+  .ln { white-space: pre; min-height: 1.5em; }
+  .border { color: #5b6472; }
+  .accent { color: var(--accent); }
+  .bold { font-weight: 600; }
+  .text { color: var(--text); }
+  .dim { color: var(--dim); }
+  .ok { color: var(--ok); }
+  .warn { color: var(--warn); }
+  .err { color: var(--err); }
+  .sel { background: #c7d0dd; color: #0b0e14; }
+  .screen { margin: 40px 0 0; }
+  .caption h2 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+  .caption p { margin: 6px 0 14px; color: var(--dim); font-size: 13.5px; max-width: 76ch; }
+  .note { margin: 12px 2px 0; color: var(--dim); font-size: 12.5px; }
+  .note b { color: var(--text); font-weight: 600; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+  .card { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 15px 16px; }
+  .card p { margin: 0; color: var(--dim); font-size: 13px; }
+  table.keys { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.keys th, table.keys td { text-align: left; padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.keys th { color: var(--dim); font: 600 11px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+  table.keys td code, p code { font: 12.5px/1.4 var(--mono); color: var(--text); }
+  table.keys td:first-child code { color: var(--accent); }
+  .muted { color: var(--dim); }
+  .tokens { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px 24px; }
+  .token { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .sw { width: 18px; height: 18px; border-radius: 4px; border: 1px solid #2a3140; flex: 0 0 auto; }
+  .token code { margin-left: auto; color: var(--dim); font: 12px/1 var(--mono); }
+  footer { margin: 72px 0 0; padding-top: 20px; border-top: 1px solid var(--line); color: var(--dim); font-size: 12.5px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  @media (max-width: 700px) {
+    .page { padding: 36px 14px 64px; }
+    h1 { font-size: 24px; }
+    .term-body { padding: 12px 12px 14px; }
+    .brand { display: none; }
+    .winmeta { display: none; }
+    .statusbar { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="eyebrow">hubctl &middot; UI design</div>
+  <h1>Window concept, then the ASCII screen</h1>
+  <p class="lede">
+    First the app as a window: title bar, tabs, table, status bar. Then the
+    same screen as the terminal actually draws it. The ASCII frame is the
+    shipped target; the window is the layout reference.
+  </p>
+  <div class="chips">
+    <span class="chip">window concept</span>
+    <span class="chip">ASCII target</span>
+    <span class="chip">ANSI SGR</span>
+    <span class="chip">80 x 24</span>
+    <span class="chip">stdlib only</span>
+  </div>
+
+  <nav>
+    <a href="#window">WINDOW</a>
+    <a href="#ascii">ASCII</a>
+    <a href="#tokens">TOKENS</a>
+    <a href="#keys">KEYS</a>
+    <a href="#rules">RULES</a>
+    <a href="../architecture/overview.html">ARCHITECTURE &rarr;</a>
+  </nav>
+
+  <section class="block" id="window">
+    <h2 class="block-title">1 &middot; Window concept</h2>
+    <p class="sub">Use the tabs to step through the four states. This is a layout reference: the app has no mouse and no GUI toolkit.</p>
+
+    <div class="stage">
+      <input type="radio" name="state" id="s-live" checked>
+      <input type="radio" name="state" id="s-interlock">
+      <input type="radio" name="state" id="s-stale">
+      <input type="radio" name="state" id="s-lost">
+
+      <div class="win">
+        <div class="titlebar">
+          <div class="lights"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+          <div class="wintitle">hubctl &mdash; SmartUSBHub Pro 4CH</div>
+          <div class="winactions">&ndash; &#9633; &times;</div>
+        </div>
+
+        <div class="toolbar">
+          <div class="brand"><span class="logo">h</span> hubctl</div>
+          <div class="tabs">
+            <label for="s-live">Live</label>
+            <label for="s-interlock">Interlock</label>
+            <label for="s-stale">Stale</label>
+            <label for="s-lost">Lost</label>
+          </div>
+          <div class="winmeta">80 x 24</div>
+        </div>
+
+        <div class="content">
+
+          <div class="pane pane-live">
+            <div class="strip">
+              <span class="badge ok">LIVE</span>
+              <span>poll 1.0 s</span>
+              <span class="spacer"></span>
+              <span>normal</span>
+              <span class="mono">1a86:fe0c</span>
+              <span class="mono">/dev/ttyACM0</span>
+            </div>
+            <table class="channels">
+              <thead><tr><th>CH</th><th>Power</th><th>Data</th><th>VBUS</th><th>Current</th></tr></thead>
+              <tbody>
+                <tr><td class="ch">CH1</td><td><span class="pill off">off</span></td><td class="muted" title="not meaningful while VBUS is off">&mdash;</td><td class="num muted">(202 mV)</td><td class="num">0.00 A</td></tr>
+                <tr><td class="ch">CH2</td><td><span class="pill off">off</span></td><td class="muted" title="not meaningful while VBUS is off">&mdash;</td><td class="num muted">(198 mV)</td><td class="num">0.00 A</td></tr>
+                <tr class="selected"><td class="ch">CH3</td><td><span class="pill off">off</span></td><td class="muted" title="not meaningful while VBUS is off">&mdash;</td><td class="num muted">(205 mV)</td><td class="num">0.00 A</td></tr>
+                <tr><td class="ch">CH4</td><td><span class="pill on">ON</span></td><td>on</td><td class="num">4.61 V</td><td class="num">0.00 A</td></tr>
+              </tbody>
+            </table>
+            <div class="meta">
+              <div><span class="label">DEVICE</span>HBP_USB2_4CH &middot; 4 channels &middot; addr 0x0000</div>
+              <div><span class="label">SETTINGS</span>buttons enabled &middot; restore disabled</div>
+              <div><span class="label">LAST</span>poll ok &mdash; 4 channels</div>
+            </div>
+          </div>
+
+          <div class="pane pane-interlock">
+            <div class="strip">
+              <span class="badge warn">INTERLOCK</span>
+              <span class="spacer"></span>
+              <span class="mono">1a86:fe0c</span>
+              <span class="mono">/dev/ttyACM0</span>
+            </div>
+            <div class="notice warn"><b>!</b><span><b>Switching disabled.</b> Hold CH1 for 3 s to return to normal, then press R.</span></div>
+            <table class="channels">
+              <thead><tr><th>CH</th><th>Power</th><th>Data</th><th>VBUS</th><th>Current</th></tr></thead>
+              <tbody>
+                <tr><td class="ch">CH1</td><td><span class="pill off">off</span></td><td class="muted">&mdash;</td><td class="num muted">(202 mV)</td><td class="num">0.00 A</td></tr>
+                <tr><td class="ch">CH2</td><td><span class="pill off">off</span></td><td class="muted">&mdash;</td><td class="num muted">(198 mV)</td><td class="num">0.00 A</td></tr>
+                <tr class="selected"><td class="ch">CH3</td><td><span class="pill off">off</span></td><td class="muted">&mdash;</td><td class="num muted">(205 mV)</td><td class="num">0.00 A</td></tr>
+                <tr><td class="ch">CH4</td><td><span class="pill on">ON</span></td><td>on</td><td class="num">4.61 V</td><td class="num">0.00 A</td></tr>
+              </tbody>
+            </table>
+            <div class="meta">
+              <div><span class="label">DEVICE</span>HBP_USB2_4CH &middot; 4 channels &middot; addr 0x0000</div>
+              <div><span class="label">LAST</span>mode is interlock &mdash; switching disabled</div>
+            </div>
+          </div>
+
+          <div class="pane pane-stale">
+            <div class="strip">
+              <span class="badge warn">STALE 3.4 s</span>
+              <span class="spacer"></span>
+              <span>normal</span>
+              <span class="mono">1a86:fe0c</span>
+              <span class="mono">/dev/ttyACM0</span>
+            </div>
+            <div class="notice warn"><b>!</b><span><b>Values are not live.</b> No reply to the last poll; retrying.</span></div>
+            <table class="channels dim">
+              <thead><tr><th>CH</th><th>Power</th><th>Data</th><th>VBUS</th><th>Current</th></tr></thead>
+              <tbody>
+                <tr><td class="ch">CH1</td><td><span class="pill off">off</span></td><td class="muted">&mdash;</td><td class="num muted">(202 mV)</td><td class="num">0.00 A</td></tr>
+                <tr><td class="ch">CH2</td><td><span class="pill off">off</span></td><td class="muted">&mdash;</td><td class="num muted">(198 mV)</td><td class="num">0.00 A</td></tr>
+                <tr class="selected"><td class="ch">CH3</td><td><span class="pill off">off</span></td><td class="muted">&mdash;</td><td class="num muted">(205 mV)</td><td class="num">0.00 A</td></tr>
+                <tr><td class="ch">CH4</td><td><span class="pill on">ON</span></td><td>on</td><td class="num">4.61 V</td><td class="num">0.00 A</td></tr>
+              </tbody>
+            </table>
+            <div class="meta">
+              <div><span class="label">LAST</span>no reply to 0x00 (poll 3) &mdash; retrying</div>
+            </div>
+          </div>
+
+          <div class="pane pane-lost">
+            <div class="strip">
+              <span class="badge err">LOST</span>
+              <span>reconnect 2 in 3 s</span>
+              <span class="spacer"></span>
+              <span class="mono">1a86:fe0c</span>
+              <span class="mono">/dev/ttyACM0</span>
+            </div>
+            <div class="notice err"><b>!</b><span><b>Device stopped replying.</b> State unknown; nothing was applied. Reconnecting.</span></div>
+            <table class="channels dim">
+              <thead><tr><th>CH</th><th>Power</th><th>Data</th><th>VBUS</th><th>Current</th></tr></thead>
+              <tbody>
+                <tr><td class="ch">CH1</td><td><span class="pill unknown">?</span></td><td class="muted">?</td><td class="num">?</td><td class="num">?</td></tr>
+                <tr><td class="ch">CH2</td><td><span class="pill unknown">?</span></td><td class="muted">?</td><td class="num">?</td><td class="num">?</td></tr>
+                <tr class="selected"><td class="ch">CH3</td><td><span class="pill unknown">?</span></td><td class="muted">?</td><td class="num">?</td><td class="num">?</td></tr>
+                <tr><td class="ch">CH4</td><td><span class="pill unknown">?</span></td><td class="muted">?</td><td class="num">?</td><td class="num">?</td></tr>
+              </tbody>
+            </table>
+            <div class="meta">
+              <div><span class="label">LAST</span>device stopped replying &mdash; state unknown, nothing applied</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="statusbar">
+          <span><b>j/k</b> select &nbsp; <b>space</b> power &nbsp; <b>d</b> data &nbsp; <b>r</b> refresh &nbsp; <b>q</b> quit</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="ascii">
+    <h2 class="block-title">2 &middot; ASCII rendering</h2>
+    <p class="sub">The same screen with no chrome: 80 columns, a box-drawn frame, one SGR colour per meaning. It falls back to <code>+ - |</code> when the locale is not UTF-8. Frames are shown at 80x20 to save space; the app uses 80x24. Run <code>python3 docs/ui/mockup/preview.py</code> for the live version.</p>
+
+    <div class="screen">
+      <div class="caption"><h2>Live</h2><p>Normal mode, CH4 powered.</p></div>
+      <div class="term">
+        <div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">hubctl &mdash; /dev/ttyACM0 &mdash; live</span></div>
+        <div class="term-body">
+<div class="ln"><span class="border">┌─</span><span class="accent bold"> hubctl </span><span class="border">───────────────────────────────────────────────</span><span class="text"> SmartUSBHub Pro 4CH </span><span class="border">─┐</span></div>
+<div class="ln"><span class="border">│</span> <span class="accent bold">hubctl</span> - SmartUSBHub Pro 4CH                                <span class="dim">FW V2.0  HW V1.3 </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">/dev/ttyACM0  1a86:fe0c  </span>normal  <span class="ok">live</span><span class="dim">  poll 1.0 s</span>                            <span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH   POWER   DATA   VBUS        CURRENT</span>                                    <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>   CH1  <span class="dim">off</span>     <span class="dim">-</span>      <span class="dim">(202 mV)</span>    0.00 A                                     <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>   CH2  <span class="dim">off</span>     <span class="dim">-</span>      <span class="dim">(198 mV)</span>    0.00 A                                     <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="sel"> &gt; CH3  off     -      (205 mV)    0.00 A                                     </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>   CH4  <span class="bold ok">ON</span>      on     4.61 V      0.00 A                                     <span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">device    </span>HBP_USB2_4CH  4 channels  addr 0x0000                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">settings  </span>buttons enabled  restore disabled                                  <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">last      </span><span class="ok">poll ok - 4 channels</span>                                               <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="bold text">j/k</span><span class="dim"> select   </span><span class="bold text">space</span><span class="dim"> power   </span><span class="bold text">d</span><span class="dim"> data   </span><span class="bold text">r</span><span class="dim"> refresh   </span><span class="bold text">q</span><span class="dim"> quit   </span>           <span class="dim">        </span> <span class="border">│</span></div>
+<div class="ln"><span class="border">└──────────────────────────────────────────────────────────────────────────────┘</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen">
+      <div class="caption"><h2>Interlock</h2><p>Switching disabled; the banner says how to get out.</p></div>
+      <div class="term">
+        <div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">hubctl &mdash; /dev/ttyACM0 &mdash; interlock</span></div>
+        <div class="term-body">
+<div class="ln"><span class="border">┌─</span><span class="accent bold"> hubctl </span><span class="border">───────────────────────────────────────────────</span><span class="text"> SmartUSBHub Pro 4CH </span><span class="border">─┐</span></div>
+<div class="ln"><span class="border">│</span> <span class="accent bold">hubctl</span> - SmartUSBHub Pro 4CH                                <span class="dim">FW V2.0  HW V1.3 </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">/dev/ttyACM0  1a86:fe0c  </span><span class="warn">interlock</span>  <span class="ok">live</span><span class="dim">  poll 1.0 s</span>                         <span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span> <span class="warn">! interlock - switching disabled. Hold CH1 3 s, then r.</span>                      <span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH   POWER   DATA   VBUS        CURRENT</span>                                    <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>   CH1  <span class="dim">off</span>     <span class="dim">-</span>      <span class="dim">(202 mV)</span>    0.00 A                                     <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>   CH2  <span class="dim">off</span>     <span class="dim">-</span>      <span class="dim">(198 mV)</span>    0.00 A                                     <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="sel"> &gt; CH3  off     -      (205 mV)    0.00 A                                     </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>   CH4  <span class="bold ok">ON</span>      on     4.61 V      0.00 A                                     <span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">device    </span>HBP_USB2_4CH  4 channels  addr 0x0000                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">settings  </span>buttons enabled  restore disabled                                  <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">last      </span><span class="warn">mode is interlock - switching disabled</span>                             <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="bold text">j/k</span><span class="dim"> select   </span><span class="dim">space</span><span class="dim"> -   </span><span class="dim">d</span><span class="dim"> -   </span><span class="bold text">r</span><span class="dim"> refresh   </span><span class="bold text">q</span><span class="dim"> quit   </span>                  <span class="dim">        </span> <span class="border">│</span></div>
+<div class="ln"><span class="border">└──────────────────────────────────────────────────────────────────────────────┘</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen">
+      <div class="caption"><h2>Stale</h2><p>Values dimmed, age shown, controls gated.</p></div>
+      <div class="term">
+        <div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">hubctl &mdash; /dev/ttyACM0 &mdash; stale</span></div>
+        <div class="term-body">
+<div class="ln"><span class="border">┌─</span><span class="accent bold"> hubctl </span><span class="border">───────────────────────────────────────────────</span><span class="text"> SmartUSBHub Pro 4CH </span><span class="border">─┐</span></div>
+<div class="ln"><span class="border">│</span> <span class="accent bold">hubctl</span> - SmartUSBHub Pro 4CH                                <span class="dim">FW V2.0  HW V1.3 </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">/dev/ttyACM0  1a86:fe0c  </span>normal  <span class="warn">stale 3.4 s</span><span class="dim">  poll 1.0 s</span>                     <span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH   POWER   DATA   VBUS        CURRENT</span>                                    <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH1  off     -      (202 mV)    0.00 A                                     </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH2  off     -      (198 mV)    0.00 A                                     </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="sel"> &gt; CH3  off     -      (205 mV)    0.00 A                                     </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH4  ON      on     4.61 V      0.00 A                                     </span><span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">device    </span>HBP_USB2_4CH  4 channels  addr 0x0000                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">settings  </span>buttons enabled  restore disabled                                  <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">last      </span><span class="warn">no reply to 0x00 (poll 3) - retrying</span>                               <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="bold text">j/k</span><span class="dim"> select   </span><span class="dim">space</span><span class="dim"> -   </span><span class="dim">d</span><span class="dim"> -   </span><span class="bold text">r</span><span class="dim"> refresh   </span><span class="bold text">q</span><span class="dim"> quit   </span>                  <span class="dim">        </span> <span class="border">│</span></div>
+<div class="ln"><span class="border">└──────────────────────────────────────────────────────────────────────────────┘</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen">
+      <div class="caption"><h2>Lost</h2><p>Every field unknown; reconnect re-probes identity.</p></div>
+      <div class="term">
+        <div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">hubctl &mdash; reconnect &mdash; attempt 2</span></div>
+        <div class="term-body">
+<div class="ln"><span class="border">┌─</span><span class="accent bold"> hubctl </span><span class="border">───────────────────────────────────────────────</span><span class="text"> SmartUSBHub Pro 4CH </span><span class="border">─┐</span></div>
+<div class="ln"><span class="border">│</span> <span class="accent bold">hubctl</span> - SmartUSBHub Pro 4CH                                <span class="dim">FW V2.0  HW V1.3 </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">/dev/ttyACM0  1a86:fe0c  </span>normal  <span class="err">lost - reconnect 2 in 3 s</span><span class="dim">  poll 1.0 s</span>       <span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH   POWER   DATA   VBUS        CURRENT</span>                                    <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH1  ?       ?      ?           ?                                          </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH2  ?       ?      ?           ?                                          </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="sel"> &gt; CH3  ?       ?      ?           ?                                          </span><span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="dim">   CH4  ?       ?      ?           ?                                          </span><span class="border">│</span></div>
+<div class="ln"><span class="border">├──────────────────────────────────────────────────────────────────────────────┤</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">device    </span>HBP_USB2_4CH  4 channels  addr 0x0000                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">settings  </span>buttons enabled  restore disabled                                  <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span> <span class="dim">last      </span><span class="err">device stopped replying - state unknown, nothing applied</span>           <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span>                                                                              <span class="border">│</span></div>
+<div class="ln"><span class="border">│</span><span class="bold text"> q</span><span class="dim"> quit   </span><span class="bold text">r</span><span class="dim"> retry now</span>                                                <span class="dim">        </span> <span class="border">│</span></div>
+<div class="ln"><span class="border">└──────────────────────────────────────────────────────────────────────────────┘</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="tokens">
+    <h2 class="block-title">ANSI tokens</h2>
+    <p class="sub">256-colour SGR when supported, 8-colour otherwise. With <code>NO_COLOR</code> or <code>TERM=dumb</code>, no colour is emitted; the frame and the <code>&gt;</code> marker do not change.</p>
+    <div class="tokens">
+      <div class="token"><span class="sw" style="background:#c9d1d9"></span>text &mdash; table, keys<code>252 / default</code></div>
+      <div class="token"><span class="sw" style="background:#7c8798"></span>dim &mdash; off, residual<code>244 / 90</code></div>
+      <div class="token"><span class="sw" style="background:#56d4dd"></span>accent &mdash; wordmark<code>81 / 36</code></div>
+      <div class="token"><span class="sw" style="background:#56d364"></span>ok &mdash; <code>ON</code>, <code>live</code><code>78 / 32</code></div>
+      <div class="token"><span class="sw" style="background:#e3b341"></span>warn &mdash; stale, interlock<code>220 / 33</code></div>
+      <div class="token"><span class="sw" style="background:#f85149"></span>error &mdash; lost, failed write<code>203 / 31</code></div>
+      <div class="token"><span class="sw" style="background:#5b6472"></span>border &mdash; frame, dividers<code>240 / 90</code></div>
+      <div class="token"><span class="sw" style="background:#c7d0dd"></span>selection &mdash; reverse video<code>SGR 7</code></div>
+    </div>
+  </section>
+
+  <section class="block" id="keys">
+    <h2 class="block-title">Keys</h2>
+    <p class="sub">No key writes persistent settings, resets the unit, or acts on more than one channel.</p>
+    <table class="keys">
+      <thead><tr><th>Key</th><th>Action</th><th>Enabled when</th><th>Guard</th></tr></thead>
+      <tbody>
+        <tr><td><code>j</code> / <code>Down</code></td><td>select next channel</td><td>always</td><td class="muted">&mdash;</td></tr>
+        <tr><td><code>k</code> / <code>Up</code></td><td>select previous channel</td><td>always</td><td class="muted">&mdash;</td></tr>
+        <tr><td><code>Space</code></td><td>toggle VBUS on the selected channel</td><td>LIVE, normal mode</td><td>0.4 s repeat guard</td></tr>
+        <tr><td><code>d</code></td><td>toggle D+/D&minus; on the selected channel</td><td>LIVE, normal, power known <code>ON</code></td><td>0.4 s repeat guard</td></tr>
+        <tr><td><code>r</code></td><td>poll now; retry a lost link</td><td>always</td><td class="muted">&mdash;</td></tr>
+        <tr><td><code>q</code> / <code>Ctrl-C</code></td><td>quit, restore the terminal</td><td>always</td><td class="muted">&mdash;</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="block" id="rules">
+    <h2 class="block-title">Presentation rules</h2>
+    <div class="cards">
+      <div class="card"><h3>POWER</h3><p>Read from <code>0x00</code> only. Never inferred from a voltage reading: an off channel reads 202 mV on this unit.</p></div>
+      <div class="card"><h3>DATA</h3><p><code>on</code>, <code>off</code>, or <code>-</code> while VBUS is off. The D+/D&minus; state is not meaningful there.</p></div>
+      <div class="card"><h3>VOLTAGE</h3><p><code>4.61 V</code> from the mV reply. On an off channel: <code>(202 mV)</code>, dim, never an output.</p></div>
+      <div class="card"><h3>CURRENT</h3><p><code>0.00 A</code> from the mA reply. Below the accuracy floor still reads <code>0.00 A</code>.</p></div>
+      <div class="card"><h3>UNKNOWN</h3><p><code>?</code> for any field not received in the last complete poll. Never a stale number.</p></div>
+      <div class="card"><h3>UNITS</h3><p>V and A on screen. Raw mV/mA and frame hex go to <code>--trace</code>, not the table.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    Static reference for <a href="../ui/dashboard.md">UI-DASH-001</a> &middot;
+    runnable ANSI screen: <a href="../ui/mockup/preview.py">preview.py</a> &middot;
+    architecture: <a href="../architecture/overview.html">overview</a>.
+  </footer>
+</div>
+</body>
+</html>
