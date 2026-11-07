@@ -47,15 +47,22 @@ def mockup_cases():
         (make_snapshot(), menu.State(menu.MENU, port_index=1), 60, 16),
         (make_snapshot(action="connected HBP_USB2_4CH on /dev/ttyACM0"),
          menu.State(menu.DEVICE), 80, 24),
+        (make_snapshot(action="connected HBP_USB2_4CH on /dev/ttyACM0"),
+         menu.State(menu.HELP), 80, 24),
+        (make_snapshot(action="connected HBP_USB2_4CH on /dev/ttyACM0"),
+         menu.State(menu.PORT, port=2), 80, 24),
+        (make_snapshot(action="connected HBP_USB2_4CH on /dev/ttyACM0",
+                       port="/dev/ttyACM0", port_choices=("/dev/ttyACM0",)),
+         menu.State(menu.SETTINGS), 80, 24),
     ]
 
 
 class MockupTests(unittest.TestCase):
-    def test_all_nine_frames_reproduce_character_for_character(self):
+    def test_all_mockup_frames_reproduce_character_for_character(self):
         expected = mockup_frames()
         cases = mockup_cases()
-        self.assertEqual(len(expected), 9)
-        self.assertEqual(len(cases), 9)
+        self.assertEqual(len(expected), 12)
+        self.assertEqual(len(cases), 12)
         for number, (block, (snapshot, state, width, height)) in enumerate(
                 zip(expected, cases)):
             lines = plain(frame(snapshot, state, width, height))

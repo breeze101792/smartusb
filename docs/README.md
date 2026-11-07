@@ -44,10 +44,12 @@ log.
 ## Stage
 
 Control app implemented. `src/hubctl` runs one USB Control page against the CMD
-port: identity, mode, per-port power/data/voltage/current, and guarded VBUS/D+/D-
-switching on the selected port. `m` opens a global menu with `Device`. The host
-suite, the pty app test, the refactored lab-tool self-test, and a read-only
-on-target run pass. Real VBUS switching by the app is not yet run.
+port: identity, mode, per-port power/data/voltage/current, a read-only detail
+page per port, a Settings page for the endpoint and poll period, and guarded
+VBUS/D+/D- switching on the selected port. `m` opens a global menu with
+`Device`, `Settings` and `Help`. The host suite, the pty app test, the
+refactored lab-tool self-test, and a read-only on-target run pass. Real VBUS
+switching by the app is not yet run.
 
 ## Reading order
 

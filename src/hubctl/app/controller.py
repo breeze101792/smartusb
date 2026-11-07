@@ -7,7 +7,11 @@ import time
 from ..constants import (
     FAILURE_LIMIT,
     LINK_DEADLINE_S,
+    POLL_CHOICES_S,
     POLL_INTERVAL_S,
+    POLL_MAX_S,
+    POLL_MIN_S,
+    PORT_CHOICES_TTL_S,
     RECONNECT_BACKOFF_S,
     STALE_AFTER_POLLS,
     WRITE_SETTLE_S,
@@ -26,6 +30,7 @@ from ..hal.base import (
     Status,
     Timeout,
 )
+from ..hal.discovery import candidate_ports
 from ..hal.registry import open_first
 
 
@@ -55,9 +60,15 @@ class Controller:
     """
 
     def __init__(self, open_fn=None, poll_interval: float = POLL_INTERVAL_S,
-                 clock=time.monotonic, sleep=time.sleep):
-        self._open_fn = open_fn or (lambda: open_first())
+                 clock=time.monotonic, sleep=time.sleep,
+                 port: str | None = None, trace=None):
+        self._port = port
+        self._trace = trace
+        self._open_fn = open_fn or (
+            lambda: open_first(self._port, trace=self._trace))
         self._poll = poll_interval
+        self._port_choices: tuple[str, ...] = ()
+        self._choices_at: float | None = None
         self._clock = clock
         self._sleep = sleep
 
@@ -89,6 +100,42 @@ class Controller:
             except DeviceError:
                 pass
         self._driver = None
+
+    def _port_options(self) -> tuple[str, ...]:
+        now = self._clock()
+        if (self._choices_at is None
+                or now - self._choices_at > PORT_CHOICES_TTL_S):
+            choices = list(dict.fromkeys(candidate_ports()))
+            if self._port is not None and self._port not in choices:
+                choices.append(self._port)
+            self._port_choices = tuple(choices)
+            self._choices_at = now
+        return self._port_choices
+
+    def set_port(self, port: str | None):
+        """Switch endpoint and reopen. None means discovery."""
+        if port == self._port:
+            return
+        self._port = port
+        self.close()
+        self._identity = None
+        self._status = Status()
+        self._channels = {}
+        self._cycle = []
+        self._failures = 0
+        self._last_cycle = None
+        self._backoff = 0
+        self._next_open = self._clock()
+        self._choices_at = None
+        self._note(f"port set to {port or 'auto'}", "ok")
+
+    def set_poll(self, seconds: float):
+        """Change the full poll period, bounded like the CLI."""
+        seconds = max(POLL_MIN_S, min(POLL_MAX_S, seconds))
+        if seconds == self._poll:
+            return
+        self._poll = seconds
+        self._note(f"poll set to {seconds:.1f} s", "ok")
 
     def request_refresh(self):
         """Poll now. Also retries a lost link immediately."""
@@ -148,6 +195,8 @@ class Controller:
             last_error=self._last_error,
             reconnect_in_s=reconnect,
             poll_interval_s=self._poll,
+            port_setting=self._port,
+            port_choices=self._port_options(),
         )
 
     # --- connect / reconnect ---------------------------------------------

@@ -58,6 +58,8 @@ class Snapshot:
     last_error: str | None = None
     reconnect_in_s: float | None = None
     poll_interval_s: float = 1.0
+    port_setting: str | None = None
+    port_choices: tuple[str, ...] = ()
 
 
 class DeviceError(Exception):

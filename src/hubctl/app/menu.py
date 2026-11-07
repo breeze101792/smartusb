@@ -4,21 +4,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from ..constants import MAX_CHANNELS
+from ..constants import MAX_CHANNELS, POLL_CHOICES_S
 from ..hal.base import ChannelReading, LinkState, Snapshot
 
 # Screens. The control page is the only page; the menu opens over it.
 CONTROL = "control"
+PORT = "port"
 MENU = "menu"
 DEVICE = "device"
+SETTINGS = "settings"
+HELP = "help"
 
 # Item actions.
 OPEN_DEVICE = "open-device"
+OPEN_SETTINGS = "open-settings"
+OPEN_HELP = "open-help"
 BACK = "back"
 QUIT = "quit"
 REFRESH = "refresh"
 TOGGLE_POWER = "toggle-power"
 TOGGLE_DATA = "toggle-data"
+SET_PORT = "set-port"
+SET_POLL = "set-poll"
 
 # Style tokens, docs/ui/menu.md section 7.
 TEXT = "text"
@@ -29,6 +36,8 @@ ERR = "err"
 RAIL = "rail"
 
 LABEL_DEVICE = "Device"
+LABEL_SETTINGS = "Settings"
+LABEL_HELP = "Help"
 LABEL_BACK = "Back"
 MENU_HEADING = "GLOBAL MENU"
 PORT_LABEL = "USB PORT"
@@ -50,6 +59,8 @@ class State:
     screen: str = CONTROL
     port_index: int = 0
     menu_index: int = 0
+    settings_index: int = 0
+    port: int = 0
 
 
 @dataclass(frozen=True)
@@ -58,6 +69,7 @@ class Action:
 
     kind: str
     port: int = 0
+    value: object = None
 
 
 @dataclass(frozen=True)
@@ -96,8 +108,10 @@ def port_count(snapshot: Snapshot) -> int:
 def items(state: State) -> list[Item]:
     """The selectable menu and device rows. The control list is the ports."""
     if state.screen == MENU:
-        return [Item(LABEL_DEVICE, OPEN_DEVICE)]
-    if state.screen == DEVICE:
+        return [Item(LABEL_DEVICE, OPEN_DEVICE),
+                Item(LABEL_SETTINGS, OPEN_SETTINGS),
+                Item(LABEL_HELP, OPEN_HELP)]
+    if state.screen in (PORT, DEVICE, SETTINGS, HELP):
         return [Item(LABEL_BACK, BACK)]
     return []
 
@@ -106,7 +120,9 @@ def index(snapshot: Snapshot, state: State) -> int:
     """The selected row of the current screen, clamped to its list."""
     if state.screen == MENU:
         return max(0, min(state.menu_index, len(items(state)) - 1))
-    if state.screen == DEVICE:
+    if state.screen == SETTINGS:
+        return max(0, min(state.settings_index, len(SETTINGS_ROWS) - 1))
+    if state.screen in (PORT, DEVICE, HELP):
         return 0
     count = port_count(snapshot)
     return 0 if count == 0 else max(0, min(state.port_index, count - 1))
@@ -129,11 +145,40 @@ def handle_key(snapshot: Snapshot, state: State,
         return _enter(snapshot, state)
     if key == "m":
         return _menu(state)
+    if state.screen == SETTINGS and key in ("left", "right"):
+        return _change(snapshot, state, 1 if key == "right" else -1)
     if key == "space":
         return _write(snapshot, state, TOGGLE_POWER)
     if key == "d":
         return _write(snapshot, state, TOGGLE_DATA)
     return state, None
+
+
+SETTINGS_ROWS = ("port", "poll")
+
+
+def settings_rows(snapshot: Snapshot) -> list[tuple[str, str]]:
+    """The labelled settings values, in display order."""
+    return [
+        ("port", snapshot.port_setting or "auto"),
+        ("poll", f"{snapshot.poll_interval_s:.1f} s"),
+    ]
+
+
+def _change(snapshot: Snapshot, state: State,
+            delta: int) -> tuple[State, Action | None]:
+    """Left and right step the selected setting."""
+    if index(snapshot, state) == 0:
+        choices = [None, *snapshot.port_choices]
+        current = (choices.index(snapshot.port_setting)
+                   if snapshot.port_setting in choices else 0)
+        target = choices[(current + delta) % len(choices)]
+        return state, Action(SET_PORT, value=target)
+    choices = list(POLL_CHOICES_S)
+    current = min(range(len(choices)),
+                  key=lambda i: abs(choices[i] - snapshot.poll_interval_s))
+    target = choices[(current + delta) % len(choices)]
+    return state, Action(SET_POLL, value=target)
 
 
 def readout(snapshot: Snapshot, port: int) -> Readout:
@@ -194,13 +239,13 @@ def _back(state: State) -> tuple[State, Action | None]:
     """q and Esc quit on control and only ever go back elsewhere."""
     if state.screen == CONTROL:
         return state, Action(QUIT)
-    return replace(state, screen=CONTROL, menu_index=0), None
+    return replace(state, screen=CONTROL, menu_index=0, port=0), None
 
 
 def _menu(state: State) -> tuple[State, Action | None]:
     """m opens the menu on control and closes or backs out of it elsewhere."""
     screen = MENU if state.screen == CONTROL else CONTROL
-    return replace(state, screen=screen, menu_index=0), None
+    return replace(state, screen=screen, menu_index=0, port=0), None
 
 
 def _enter(snapshot: Snapshot,
@@ -210,12 +255,20 @@ def _enter(snapshot: Snapshot,
     Enter never writes and does nothing on the control page.
     """
     if state.screen == CONTROL:
-        return state, None
+        count = port_count(snapshot)
+        if count == 0:
+            return state, None
+        return replace(state, screen=PORT,
+                       port=index(snapshot, state) + 1), None
     item = items(state)[index(snapshot, state)]
     if item.action == OPEN_DEVICE:
         return replace(state, screen=DEVICE), None
+    if item.action == OPEN_SETTINGS:
+        return replace(state, screen=SETTINGS, settings_index=0), None
+    if item.action == OPEN_HELP:
+        return replace(state, screen=HELP), None
     if item.action == BACK:
-        return replace(state, screen=CONTROL), None
+        return replace(state, screen=CONTROL, port=0), None
     return state, None
 
 
@@ -228,13 +281,20 @@ def _write(snapshot: Snapshot, state: State,
 
 
 def _move(snapshot: Snapshot, state: State, delta: int) -> State:
-    """j and k wrap the control list and do nothing on the menu or Device."""
-    if state.screen != CONTROL:
-        return state
-    count = port_count(snapshot)
-    if count == 0:
-        return state
-    return replace(state, port_index=(index(snapshot, state) + delta) % count)
+    """j and k wrap the port list and the menu; Device and Help have one row."""
+    if state.screen == CONTROL:
+        count = port_count(snapshot)
+        if count == 0:
+            return state
+        return replace(state, port_index=(index(snapshot, state) + delta) % count)
+    if state.screen == MENU:
+        count = len(items(state))
+        return replace(state, menu_index=(index(snapshot, state) + delta) % count)
+    if state.screen == SETTINGS:
+        count = len(SETTINGS_ROWS)
+        return replace(state,
+                       settings_index=(index(snapshot, state) + delta) % count)
+    return state
 
 
 def _power_text(reading: ChannelReading, unknown: bool) -> str:

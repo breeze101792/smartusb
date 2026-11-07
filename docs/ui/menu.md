@@ -93,10 +93,29 @@ Footer: `SPACE power   d data   m menu   q quit`. On LOST and no device it
 becomes `r retry` in place of `r refresh`; the no-device footer is
 `r retry   m menu   q quit`.
 
-`Enter` on a port does nothing in v1. It is reserved for a future port monitor
-or advanced control. The footer does not mention it.
+`Enter` opens the selected port's detail page. The footer does not mention it.
 
-### 3.2 Global menu
+### 3.2 Port detail
+
+Header title `HUBCTL  USB PORT n - <power>`, plus ` - data <word>` when the port
+is powered. Status line: `port <port>   1a86:fe0c   <link>`.
+
+| Row | Field | Value |
+| --- | --- | --- |
+| 5 | `power` | `ON`, `off` or `?` |
+| 6 | `data` | `on`, `off`, `-` or `?` |
+| 7 | `voltage` | `4.61 V`, `(202 mV)` or `?` |
+| 8 | `current` | `0.00 A` or `?` |
+
+Labels at column 8, values at column 20, in the same tokens as the port row.
+Rows 9..12 stay free for the monitor and advanced controls that come next.
+`Back` is the only item, at row 13, selected.
+
+Footer: `ENTER back   q back`. `Enter`, `q`, `Esc` and `m` return to the control
+page with the same port selected. `Space` and `d` do nothing here: this page
+reads, and the control page writes.
+
+### 3.3 Global menu
 
 `m` on the control page replaces the port rows with the menu block on the same
 page. Header, status line, `last` and footer stay. The menu is application-wide,
@@ -108,8 +127,9 @@ not a peer page.
 | 6 | first item |
 | ... | one item per row |
 
-v1 has one item: `Device`. Later global actions append here. The selected item
-is the only reverse-video row.
+v1 has three items: `Device`, `Settings` and `Help`. Later global actions append
+here. The selected item is the only reverse-video row. `j` and `k` wrap between
+items.
 
 Footer: `ENTER open   m close   q close`. `m`, `Esc` and `q` close the menu and
 return to the list with the same port selected. Closing the menu never quits.
@@ -123,12 +143,34 @@ At 80x24 with the menu open:
    │                                                                       │
    │   GLOBAL MENU                                                         │
    │   Device                                                              │
+   │   Help                                                               │
    │                                                                       │
    │   last    USB2 off - echo ok, 0x00 off, 0x08 off                      │
    │ENTER open   m close   q close                                         │
 ```
 
-### 3.3 Device
+### 3.4 Settings
+
+Header title `HUBCTL  SETTINGS`. Status line:
+`port <port>   1a86:fe0c   <link>`.
+
+| Row | Setting | Values |
+| --- | --- | --- |
+| 5 | `port` | `auto` or a discovered endpoint, including the current one |
+| 6 | `poll` | `0.5 s`, `1.0 s`, `2.0 s`, `5.0 s` |
+
+Labels at column 8, values at column 20. `j` and `k` select a row; `Left` and
+`Right` step the value and wrap. `Back` is at row 13, selected.
+
+Footer: `LEFT/RIGHT change   ENTER back   q back`. `Enter`, `q`, `Esc` and `m`
+return to the control page.
+
+Changing `port` closes the link, clears the identity and reopens at the new
+endpoint, or by discovery for `auto`. Changing `poll` takes effect on the next
+cycle. Both write a result to the `last` line, which stays visible below the
+settings.
+
+### 3.5 Device
 
 Header title `HUBCTL  DEVICE`. Status line:
 `port <port>   1a86:fe0c   <link>`. Rows 5..11, label at 8 and value at 20:
@@ -147,7 +189,26 @@ Header title `HUBCTL  DEVICE`. Status line:
 Footer: `ENTER back   q back`. `Enter`, `q` and `Esc` return to the control
 page. The `last` line stays on row `H-1`.
 
-### 3.4 No device
+### 3.6 Help
+
+Header title `HUBCTL  HELP`. Status line: `port <port>   1a86:fe0c   <link>`.
+
+| Row | Content |
+| --- | --- |
+| 5 | `hubctl <version>` in bold, from `hubctl.__version__` |
+| 6 | `SmartUSBHub Pro 4CH terminal control` in dim |
+| 8 | `j/k     select port` |
+| 9 | `SPACE   power on/off` |
+| 10 | `d       data on/off` |
+| 11 | `m       menu, r refresh` |
+| 12 | `q       quit, Esc back` |
+| 13 | `Back`, selected |
+
+Keys are at column 8 in an 8-column cell, the description at column 16.
+`Enter`, `q`, `Esc` and `m` return to the control page. Footer:
+`ENTER back   q back`. The `last` line stays on row `H-1`.
+
+### 3.7 No device
 
 Control page with no identity:
 
@@ -181,18 +242,19 @@ The interlock banner is one line, naming the physical button on the unit:
 
 ## 5. Keys
 
-| Key | Control | Global menu | Device | Guard |
-| --- | --- | --- | --- | --- |
-| `j`, `Down` | next port | none in v1 | none | wraps |
-| `k`, `Up` | previous port | none in v1 | none | wraps |
-| `Enter` | reserved, no action | open item | back | 0.4 s |
-| `Space` | toggle VBUS on the selected port | none | none | 0.4 s |
-| `d` | toggle D+/D- on the selected port | none | none | 0.4 s |
-| `m` | open menu | close | back to control | 0.4 s |
-| `r` | poll now | poll now | poll now | — |
-| `q`, `Esc` | quit | close | back | — |
-| `Ctrl-C` | quit | quit | quit | — |
-| resize | redraw | redraw | redraw | below 60x16 show the size message |
+| Key | Control | Port detail | Global menu | Settings | Device | Help | Guard |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `j`, `Down` | next port | none | next item | next setting | none | none | wraps |
+| `k`, `Up` | previous port | none | previous item | previous setting | none | none | wraps |
+| `Left`, `Right` | none | none | none | step the value | none | none | — |
+| `Enter` | open port detail | back | open item | back | back | back | 0.4 s |
+| `Space` | toggle VBUS on the selected port | none | none | none | none | none | 0.4 s |
+| `d` | toggle D+/D- on the selected port | none | none | none | none | none | 0.4 s |
+| `m` | open menu | back to control | close | back to control | back to control | back to control | 0.4 s |
+| `r` | poll now | poll now | poll now | poll now | poll now | poll now | — |
+| `q`, `Esc` | quit | back | close | back | back | back | — |
+| `Ctrl-C` | quit | quit | quit | quit | quit | quit | — |
+| resize | redraw | redraw | redraw | redraw | redraw | redraw | below 60x16 show the size message |
 
 The 0.4 s guard is per key, and every event of a guarded key refreshes its
 timestamp, including a dropped one. Holding a key acts at most once when
@@ -268,8 +330,8 @@ supported hardware; the case is unverified.
 
 ## 9. Out of scope
 
-No port monitor or advanced control screen in v1; `Enter` on a port is reserved
-for it. No mouse, no scrolling lists, no port names or aliases, no downstream
+The port detail page is read-only in v1. The monitor and advanced controls that
+fill rows 9..12 come later. No mouse, no scrolling lists, no port names or aliases, no downstream
 device map, no persistent settings writes, no reset or firmware update, no V2/V3
 streaming, no interlock control.
 
@@ -282,7 +344,10 @@ streaming, no interlock control.
 | Port rows use the fixed columns, one per probed port, 1..7 | render at 4 and 7 ports | host |
 | Selection is one reverse-video row on ports and in the menu, survives `NO_COLOR` | assert `SGR 7` on exactly one row | host |
 | `m` replaces the port rows with the menu, keeps header, status, `last`, footer | render assertion | host |
+| Enter opens the selected port detail with four labelled fields; Enter, q, Esc and m return | render and TUI assertions | host |
 | `m`, `Esc` and `q` close the menu and never quit | TUI loop with a fake controller | host |
+| Menu items `Device`, `Settings` and `Help`; `j`/`k` wrap and Enter opens the selection | menu and TUI assertions | host |
+| Help shows the package version and the key list; Enter, q, Esc and m return | render and TUI assertions | host |
 | Enter on a port does nothing; Enter opens Device from the menu; Enter returns from Device | TUI loop | host |
 | Space and `d` write on the control page; the guard is per key; Enter never writes | TUI loop | host |
 | Power-off port: data cell `-`, data write refused with a `last` note | render and loop assertions | host |

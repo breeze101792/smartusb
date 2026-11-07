@@ -272,10 +272,10 @@ downstream sysfs device map, non-interactive CLI output, mouse.
 | --- | --- | --- |
 | Codec matches documented and captured frames | vector tests, bad checksum resync, truncation | host — 8 pass |
 | Driver: identity, masks, reads, writes, rejection, silence, allow-list | pty fake device | host — 10 pass |
-| Controller: poll schedule, write verify, staleness, reconnect without replay, result strings | fake driver, injectable clock | host — 20 pass |
-| Menu model: port list, global menu, Device, Enter never writes, key routing, guarded keys | pure `menu` assertions | host — 28 pass |
-| Render: frame, states, width/height sweep, clipping, selection without colour, nine mockup frames | pure `render()` assertions | host — 32 pass |
-| TUI loop: `m` opens and closes, Enter opens Device, per-key repeat guard, quit | fake controller, terminal and clock | host — 16 pass |
+| Controller: poll schedule, write verify, staleness, reconnect, result strings, port and poll settings | fake driver, injectable clock | host — 23 pass |
+| Menu model: port list, port detail, global menu, Settings, Enter never writes, key routing | pure `menu` assertions | host — 32 pass |
+| Render: frame, states, width/height sweep, clipping, selection without colour, twelve mockup frames | pure `render()` assertions | host — 32 pass |
+| TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, per-key repeat guard, quit | fake controller, terminal and clock | host — 18 pass |
 | Discovery filters `fe0c` and rejects `8091` | fake sysfs tree | host — 2 pass |
 | Key decode: arrows, lone Esc, unknown sequences ignored, plain keys | raw pipe fd | host — 4 pass |
 | App starts, toggles a port, opens the menu, quits, restores the screen | real app process in a pty | host — 2 pass |

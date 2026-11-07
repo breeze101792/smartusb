@@ -22,12 +22,12 @@ The last command reads the unit and switches nothing.
 | --- | --- | --- | --- |
 | T-APP-001 | V1/V2/V3 framing, CRC, resync, truncation, masks | `tests/test_protocol.py` | 8 pass |
 | T-APP-002 | Driver identity, status, reads, writes, interlock rejection, bad echo, silence, allow-list, unsolicited report | `tests/test_driver.py` (pty fake) | 10 pass |
-| T-APP-003 | Controller poll cycle, staleness, deadline, write readback, mismatch, rejection, data guard, backoff, identity gate, no replay, result strings, link loss during readback | `tests/test_controller.py` (fake driver, fake clock) | 20 pass |
-| T-APP-004 | Frame: rails, bars, badge, port grid, reverse-video selection, residual voltage, data dash, every link state, interlock, no device, 60x16, ASCII rails, width/height sweep, clipping, LOST dim, menu block, Device page, all nine mockup frames character for character | `tests/test_view.py` | 32 pass |
+| T-APP-003 | Controller poll cycle, staleness, deadline, write readback, mismatch, rejection, data guard, backoff, identity gate, no replay, result strings, link loss during readback, port and poll settings | `tests/test_controller.py` (fake driver, fake clock) | 23 pass |
+| T-APP-004 | Frame: rails, bars, badge, port grid, reverse-video selection, residual voltage, data dash, every link state, interlock, no device, 60x16, ASCII rails, width/height sweep, clipping, LOST dim, menu, port detail, Device, Help, Settings, all twelve mockup frames | `tests/test_view.py` | 32 pass |
 | T-APP-005 | Discovery keeps `fe0c`, rejects `8091` | `tests/test_discovery.py` (fake sysfs tree) | 2 pass |
 | T-APP-006 | Real app process: start, draw, toggle a port with Space, open the menu, quit, alternate-screen restore; no-device state | `tests/test_app_pty.py` (pty + FakeHub) | 2 pass |
-| T-APP-007 | Control page and global menu: port list, selection wrap, `m` open/close, Enter reserved on ports, Enter opens Device, key routing | `tests/test_menu.py` | 28 pass |
-| T-APP-008 | TUI loop: `m` opens and closes, Enter opens Device, Space and `d` act, per-key repeat guard, q/Esc quit and back, refresh on every screen | `tests/test_tui.py` (fake controller, terminal and clock) | 16 pass |
+| T-APP-007 | Control page, port detail, global menu and Settings: port list, selection wrap, Enter opens the port detail, Enter opens Device, Settings or Help, value stepping | `tests/test_menu.py` | 32 pass |
+| T-APP-008 | TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, Left/Right change settings, Space and `d` act, per-key repeat guard, quit and back | `tests/test_tui.py` (fake controller, terminal and clock) | 18 pass |
 | T-APP-009 | Key decode: arrows, lone Esc, unknown escape sequences ignored, plain keys | `tests/test_term.py` (pipe fd) | 4 pass |
 
 The pty fake can stay silent, reject `0x01`, echo the wrong value, inject an

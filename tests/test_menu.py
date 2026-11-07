@@ -18,15 +18,19 @@ class PortTests(unittest.TestCase):
 
 
 class ItemTests(unittest.TestCase):
-    def test_menu_has_device_only(self):
+    def test_menu_has_device_settings_and_help(self):
         entries = menu.items(menu.State(menu.MENU))
-        self.assertEqual([item.label for item in entries], ["Device"])
+        self.assertEqual([item.label for item in entries],
+                         ["Device", "Settings", "Help"])
         self.assertEqual(entries[0].action, menu.OPEN_DEVICE)
+        self.assertEqual(entries[1].action, menu.OPEN_SETTINGS)
+        self.assertEqual(entries[2].action, menu.OPEN_HELP)
 
-    def test_device_has_back_only(self):
-        entries = menu.items(menu.State(menu.DEVICE))
-        self.assertEqual([item.label for item in entries], ["Back"])
-        self.assertEqual(entries[0].action, menu.BACK)
+    def test_device_and_help_have_back_only(self):
+        for screen in (menu.DEVICE, menu.SETTINGS, menu.HELP):
+            entries = menu.items(menu.State(screen))
+            self.assertEqual([item.label for item in entries], ["Back"])
+            self.assertEqual(entries[0].action, menu.BACK)
 
     def test_control_has_no_item_rows(self):
         self.assertEqual(menu.items(menu.State()), [])
@@ -103,8 +107,15 @@ class NavigationTests(unittest.TestCase):
         state, _ = menu.handle_key(self.snapshot, state, "up")
         self.assertEqual(menu.index(self.snapshot, state), 0)
 
-    def test_navigation_does_nothing_on_menu_and_device(self):
-        for state in (menu.State(menu.MENU), menu.State(menu.DEVICE)):
+    def test_menu_navigation_wraps_between_items(self):
+        state = menu.State(menu.MENU)
+        moved, _ = menu.handle_key(self.snapshot, state, "j")
+        self.assertEqual(menu.index(self.snapshot, moved), 1)
+        back, _ = menu.handle_key(self.snapshot, moved, "k")
+        self.assertEqual(menu.index(self.snapshot, back), 0)
+
+    def test_navigation_does_nothing_on_device_and_help(self):
+        for state in (menu.State(menu.DEVICE), menu.State(menu.HELP)):
             for key in ("j", "k", "down", "up"):
                 moved, action = menu.handle_key(self.snapshot, state, key)
                 self.assertIsNone(action)
@@ -129,13 +140,16 @@ class KeyTests(unittest.TestCase):
     def setUp(self):
         self.snapshot = make_snapshot(channels=4)
 
-    def test_enter_on_a_port_does_nothing(self):
+    def test_enter_on_a_port_opens_its_detail(self):
         for port_index in range(4):
             state = menu.State(port_index=port_index)
             moved, action = menu.handle_key(self.snapshot, state, "enter")
             self.assertIsNone(action)
-            self.assertEqual(moved, state)
-            self.assertEqual(moved.screen, menu.CONTROL)
+            self.assertEqual(moved.screen, menu.PORT)
+            self.assertEqual(moved.port, port_index + 1)
+            back, action = menu.handle_key(self.snapshot, moved, "enter")
+            self.assertIsNone(action)
+            self.assertEqual(back.screen, menu.CONTROL)
 
     def test_m_opens_and_closes_without_quitting(self):
         state, action = menu.handle_key(self.snapshot, menu.State(), "m")
@@ -166,6 +180,37 @@ class KeyTests(unittest.TestCase):
         back, action = menu.handle_key(self.snapshot, state, "enter")
         self.assertIsNone(action)
         self.assertEqual(back.screen, menu.CONTROL)
+
+    def test_enter_on_help_returns_to_control(self):
+        state = menu.State(menu.MENU, menu_index=2)
+        help, action = menu.handle_key(self.snapshot, state, "enter")
+        self.assertIsNone(action)
+        self.assertEqual(help.screen, menu.HELP)
+        for key in ("enter", "q", "escape", "m"):
+            back, action = menu.handle_key(self.snapshot, help, key)
+            self.assertIsNone(action)
+            self.assertEqual(back.screen, menu.CONTROL)
+
+    def test_settings_cycle_port_and_poll(self):
+        state = menu.State(menu.SETTINGS)
+        _, action = menu.handle_key(self.snapshot, state, "right")
+        self.assertEqual(action.kind, menu.SET_PORT)
+        self.assertIsNone(action.value)
+        moved, _ = menu.handle_key(self.snapshot, state, "j")
+        self.assertEqual(menu.index(self.snapshot, moved), 1)
+        _, action = menu.handle_key(self.snapshot, moved, "right")
+        self.assertEqual(action.kind, menu.SET_POLL)
+        self.assertEqual(action.value, 2.0)
+
+    def test_enter_on_settings_returns_to_control(self):
+        state = menu.State(menu.MENU, menu_index=1)
+        settings, action = menu.handle_key(self.snapshot, state, "enter")
+        self.assertIsNone(action)
+        self.assertEqual(settings.screen, menu.SETTINGS)
+        for key in ("enter", "q", "escape", "m"):
+            back, action = menu.handle_key(self.snapshot, settings, key)
+            self.assertIsNone(action)
+            self.assertEqual(back.screen, menu.CONTROL)
 
     def test_q_and_escape_return_from_device(self):
         for key in ("q", "escape"):

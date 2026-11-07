@@ -1,6 +1,7 @@
 import unittest
 
 from hubctl.app.controller import Controller
+from hubctl.constants import POLL_MAX_S, POLL_MIN_S
 from hubctl.hal.base import (
     DeviceDriver,
     Identity,
@@ -335,6 +336,27 @@ class ResultStringTests(unittest.TestCase):
         self.controller.toggle_data(2)
         self.assertEqual(self.note(), "USB2 data off - no reply, link lost")
         self.assertEqual(self.controller.snapshot().link, LinkState.LOST)
+
+    def test_set_poll_updates_the_snapshot(self):
+        self.controller.set_poll(2.0)
+        snapshot = self.controller.snapshot()
+        self.assertEqual(snapshot.poll_interval_s, 2.0)
+        self.assertEqual(snapshot.last_action, "poll set to 2.0 s")
+
+    def test_set_poll_is_bounded(self):
+        self.controller.set_poll(99.0)
+        self.assertEqual(self.controller.snapshot().poll_interval_s, POLL_MAX_S)
+        self.controller.set_poll(0.0)
+        self.assertEqual(self.controller.snapshot().poll_interval_s, POLL_MIN_S)
+
+    def test_set_port_closes_the_link_and_marks_the_setting(self):
+        self.poll_again()
+        self.controller.set_port("/dev/ttyACM1")
+        snapshot = self.controller.snapshot()
+        self.assertEqual(snapshot.port_setting, "/dev/ttyACM1")
+        self.assertIsNone(snapshot.identity)
+        self.assertEqual(snapshot.link, LinkState.LOST)
+        self.assertEqual(snapshot.last_action, "port set to /dev/ttyACM1")
 
     def test_data_while_off(self):
         self.controller.toggle_data(2)

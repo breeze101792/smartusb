@@ -6,6 +6,7 @@ from hubctl.app.view import (
     FOOTER_CONTROL,
     FOOTER_DEVICE,
     FOOTER_MENU,
+    FOOTER_SETTINGS,
     FOOTER_NO_DEVICE,
 )
 
@@ -28,6 +29,8 @@ class FakeController:
         self.refreshes = 0
         self.power = []
         self.data = []
+        self.polls = []
+        self.ports = []
 
     def tick(self, now):
         return False
@@ -40,6 +43,12 @@ class FakeController:
 
     def toggle_power(self, channel):
         self.power.append(channel)
+
+    def set_poll(self, seconds):
+        self.polls.append(seconds)
+
+    def set_port(self, port):
+        self.ports.append(port)
 
     def toggle_data(self, channel):
         self.data.append(channel)
@@ -88,14 +97,18 @@ def footers(terminal):
 
 
 class ControlTests(unittest.TestCase):
-    def test_enter_on_a_port_does_nothing_and_never_writes(self):
+    def test_enter_opens_the_port_detail_and_never_writes(self):
         code, controller, terminal = run_loop(
             [("enter", 0.0), ("enter", GAP), ("q", GAP)])
         self.assertEqual(code, 0)
         self.assertEqual(controller.power, [])
         self.assertEqual(controller.data, [])
-        self.assertTrue(all("HUBCTL  USB CONTROL" in line
+        self.assertTrue(any("HUBCTL  USB PORT 1 - ON - data on" in line
                             for line in headers(terminal)))
+        self.assertTrue(any("voltage" in "".join(frame)
+                            and "current" in "".join(frame)
+                            for frame in terminal.frames))
+        self.assertIn(FOOTER_CONTROL, footers(terminal)[-1])
 
     def test_space_and_d_write_the_selected_port(self):
         code, controller, _terminal = run_loop(
@@ -169,6 +182,19 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(FOOTER_CONTROL, footers(terminal)[-1])
 
+    def test_navigate_to_help_and_back(self):
+        code, controller, terminal = run_loop(
+            [("m", 0.0), ("j", GAP), ("j", 1.0), ("enter", 1.5),
+             ("q", 2.0), ("q", 2.5)])
+        self.assertEqual(code, 0)
+        self.assertTrue(any("HUBCTL  HELP" in line
+                            for line in headers(terminal)))
+        self.assertTrue(any("hubctl 0.1.0" in ANSI_RE.sub("", line)
+                            for frame in terminal.frames for line in frame))
+        self.assertIn(FOOTER_CONTROL, footers(terminal)[-1])
+        self.assertEqual(controller.power, [])
+        self.assertEqual(controller.data, [])
+
     def test_space_and_d_do_nothing_on_menu_and_device(self):
         code, controller, _terminal = run_loop(
             [("m", 0.0), ("space", 0.1), ("d", 0.2), ("enter", GAP),
@@ -196,6 +222,20 @@ class RefreshTests(unittest.TestCase):
              ("r", 1.5), ("q", 2.0), ("q", 2.5)])
         self.assertEqual(code, 0)
         self.assertEqual(controller.refreshes, 3)
+
+    def test_settings_changes_poll_and_port(self):
+        code, controller, terminal = run_loop(
+            [("m", 0.0), ("j", GAP), ("enter", 1.0), ("j", 1.5),
+             ("right", 2.0), ("k", 2.5), ("right", 3.0),
+             ("q", 3.5), ("q", 4.0)])
+        self.assertEqual(code, 0)
+        self.assertEqual(controller.polls, [2.0])
+        self.assertEqual(controller.ports, [None])
+        self.assertTrue(any("HUBCTL  SETTINGS" in line
+                            for line in headers(terminal)))
+        self.assertTrue(any(FOOTER_SETTINGS in line
+                            for line in footers(terminal)))
+        self.assertIn(FOOTER_CONTROL, footers(terminal)[-1])
 
     def test_ctrl_c_quits_on_every_screen(self):
         for prefix in ([], [("m", 0.0)], [("m", 0.0), ("enter", GAP)]):

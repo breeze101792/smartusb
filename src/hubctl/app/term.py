@@ -17,6 +17,7 @@ CURSOR_OFF = f"{ESC}?25l"
 CURSOR_ON = f"{ESC}?25h"
 HOME = f"{ESC}H"
 CLEAR = f"{ESC}2J"
+ESCAPE_WAIT_S = 0.05
 
 
 def color_supported() -> bool:
@@ -70,17 +71,26 @@ class Terminal:
         out.append(RESET)
         os.write(self.out_fd, "".join(out).encode("utf-8"))
 
+    def _read_sequence(self):
+        """Collect the bytes after Esc up to a CSI/SS3 final byte."""
+        sequence = b""
+        while len(sequence) < 8:
+            if not select.select([self.in_fd], [], [], ESCAPE_WAIT_S)[0]:
+                break
+            sequence += os.read(self.in_fd, 1)
+            if len(sequence) == 1 and sequence not in (b"[", b"O"):
+                break
+            if len(sequence) >= 2 and 0x40 <= sequence[-1] <= 0x7E:
+                break
+        return sequence
+
     def read_key(self, timeout_s: float):
         ready, _, _ = select.select([self.in_fd], [], [], timeout_s)
         if not ready:
             return None
         raw = os.read(self.in_fd, 1)
         if raw == b"\x1b":
-            sequence = b""
-            while select.select([self.in_fd], [], [], 0.01)[0]:
-                sequence += os.read(self.in_fd, 1)
-                if len(sequence) >= 2:
-                    break
+            sequence = self._read_sequence()
             keys = {b"[A": "up", b"[B": "down",
                     b"[C": "right", b"[D": "left"}
             if sequence in keys:

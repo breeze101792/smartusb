@@ -45,6 +45,10 @@ def _execute(controller: Controller, action: menu.Action) -> None:
         controller.toggle_power(action.port)
     elif action.kind == menu.TOGGLE_DATA:
         controller.toggle_data(action.port)
+    elif action.kind == menu.SET_PORT:
+        controller.set_port(action.value)
+    elif action.kind == menu.SET_POLL:
+        controller.set_poll(action.value)
 
 
 def _loop(controller: Controller, terminal: Terminal, color: bool,

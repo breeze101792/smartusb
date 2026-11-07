@@ -28,7 +28,8 @@ def readings(channels=4):
 
 def make_snapshot(link=LinkState.LIVE, mode=Mode.NORMAL, age=0.4,
                   action="USB2 off - echo ok, 0x00 off, 0x08 off",
-                  kind="ok", reconnect=None, channels=4, product=PRODUCT):
+                  kind="ok", reconnect=None, channels=4, product=PRODUCT,
+                  poll=1.0, port=None, port_choices=()):
     identity = Identity(product, 0, "V1.3", "V2.0", channels, 5,
                         "/dev/ttyACM0")
     return Snapshot(
@@ -40,7 +41,9 @@ def make_snapshot(link=LinkState.LIVE, mode=Mode.NORMAL, age=0.4,
         last_action=action,
         last_kind=kind,
         reconnect_in_s=reconnect,
-        poll_interval_s=1.0,
+        poll_interval_s=poll,
+        port_setting=port,
+        port_choices=port_choices,
     )
 
 

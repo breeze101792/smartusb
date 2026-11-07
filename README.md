@@ -12,7 +12,7 @@ Python standard library only. Linux and macOS. The vendor SDK under
 - Shows identity, mode, and per-port power, D+/D-, voltage and current on one
   control page, one row per port.
 - Switches VBUS and D+/D- on the selected port, then reads both states back.
-- Opens a global menu with `m`; v1 has one entry, `Device`.
+- Opens a global menu with `m`; it holds `Device`, `Settings` and `Help`.
 - Shows LIVE / STALE / LOST; switching is disabled when the link is stale or the
   unit is in interlock mode.
 - Blocks NVM writes, reset, reboot, factory reset, interlock control and V3
@@ -41,24 +41,26 @@ hubctl
 
 ## Keys
 
-| Key | Control | Global menu | Device |
-| --- | --- | --- | --- |
-| `j` / `Down` | next port | - | - |
-| `k` / `Up` | previous port | - | - |
-| `Enter` | reserved, no action | open the item | back |
-| `Space` | toggle VBUS on the selected port | - | - |
-| `d` | toggle D+/D- (only while powered) | - | - |
-| `m` | open the menu | close | back to control |
-| `r` | poll now; retry a lost link | poll now | poll now |
-| `q` / `Esc` | quit | close | back |
-| `Ctrl-C` | quit and restore the terminal | quit | quit |
+| Key | Control | Port detail | Global menu | Settings | Device | Help |
+| --- | --- | --- | --- | --- | --- | --- |
+| `j` / `Down` | next port | - | next item | next setting | - | - |
+| `k` / `Up` | previous port | - | previous item | previous setting | - | - |
+| `Left` / `Right` | - | - | - | change the value | - | - |
+| `Enter` | open the port detail | back | open the item | back | back | back |
+| `Space` | toggle VBUS on the selected port | - | - | - | - | - |
+| `d` | toggle D+/D- (only while powered) | - | - | - | - | - |
+| `m` | open the menu | back to control | close | back to control | back to control | back to control |
+| `r` | poll now; retry a lost link | poll now | poll now | poll now | poll now | poll now |
+| `q` / `Esc` | quit | back | close | back | back | back |
+| `Ctrl-C` | quit and restore the terminal | quit | quit | quit | quit | quit |
 
 `Space` and `d` are refused unless the link is LIVE, the mode is normal, and for
 `d` the port is powered. The reason appears on the `last` line.
 
 Enter never switches. Terminal autorepeat can repeat a held Enter, so the only
-write keys are `Space` and `d`, and the 0.4 s guard is per key. Enter on a port is
-reserved for a future port monitor and does nothing in v1.
+write keys are `Space` and `d`, and the 0.4 s guard is per key. Enter opens the
+port detail page, which is read-only in v1. Settings changes the endpoint and
+the poll period; a port change closes the link and reopens.
 
 ## Flags
 

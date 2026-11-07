@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from .. import __version__
 from ..constants import (
     BAR_LEFT_COL,
     BAR_RIGHT_FROM_END,
@@ -64,6 +65,18 @@ PORT_CELLS = (
 
 TITLE_CONTROL = "HUBCTL  USB CONTROL"
 TITLE_DEVICE = "HUBCTL  DEVICE"
+TITLE_SETTINGS = "HUBCTL  SETTINGS"
+TITLE_HELP = "HUBCTL  HELP"
+HELP_TITLE = f"hubctl {__version__}"
+HELP_SUBTITLE = "SmartUSBHub Pro 4CH terminal control"
+HELP_KEYS = (
+    ("j/k", "select port"),
+    ("SPACE", "power on/off"),
+    ("d", "data on/off"),
+    ("m", "menu, r refresh"),
+    ("ENTER", "open, q quit"),
+)
+HELP_KEY_WIDTH = 8
 LAST_LABEL = "last"
 INTERLOCK_BANNER = "! interlock - switching disabled. Hold CH1 3 s, then r."
 NO_DEVICE_WARN = "no SmartUSBHub CMD port"
@@ -74,6 +87,7 @@ FOOTER_CONTROL_LOST = "SPACE power   d data   r retry   m menu   q quit"
 FOOTER_NO_DEVICE = "r retry   m menu   q quit"
 FOOTER_MENU = "ENTER open   m close   q close"
 FOOTER_DEVICE = "ENTER back   q back"
+FOOTER_SETTINGS = "LEFT/RIGHT change   ENTER back   q back"
 
 
 class Style:
@@ -338,22 +352,96 @@ def _device_rows(snapshot, state, style):
     return rows
 
 
+def _help_rows(snapshot, state, style):
+    rows = {STATUS_ROW: _device_status(snapshot, style)}
+    rows[LIST_ROW] = (_indent(LABEL_COL)
+                      + style(HELP_TITLE, menu.TEXT, bold=True))
+    rows[LIST_ROW + 1] = (_indent(LABEL_COL)
+                          + style(HELP_SUBTITLE, menu.DIM))
+    for offset, (key, text) in enumerate(HELP_KEYS):
+        rows[LIST_ROW + 3 + offset] = (
+            _indent(LABEL_COL)
+            + style(pad(key, HELP_KEY_WIDTH), menu.TEXT, bold=True)
+            + style(text, menu.DIM))
+    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style)
+    return rows
+
+
+def _detail_row(label, value, token, style):
+    return (_indent(LABEL_COL)
+            + style(pad(label, DEVICE_VALUE_COL - LABEL_COL), menu.TEXT,
+                    bold=True)
+            + style(value, token))
+
+
+def _port_detail_rows(snapshot, state, style):
+    values = menu.readout(snapshot, state.port)
+    power_token = menu.OK if values.power_on else menu.DIM
+    data_token = menu.OK if values.data_on else menu.DIM
+    voltage_token = menu.TEXT if values.voltage_live else menu.DIM
+    current_token = menu.TEXT if values.current_live else menu.DIM
+    rows = {STATUS_ROW: _device_status(snapshot, style)}
+    fields = (
+        ("power", values.power_text, power_token),
+        ("data", values.data_word, data_token),
+        ("voltage", values.voltage_text, voltage_token),
+        ("current", values.current_text, current_token),
+    )
+    for offset, (label, value, token) in enumerate(fields):
+        rows[LIST_ROW + offset] = _detail_row(label, value, token, style)
+    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style)
+    return rows
+
+
+def _settings_rows(snapshot, state, style):
+    rows = {STATUS_ROW: _device_status(snapshot, style)}
+    selected = menu.index(snapshot, state)
+    for offset, (label, value) in enumerate(menu.settings_rows(snapshot)):
+        text = (style(pad(label, DEVICE_VALUE_COL - LABEL_COL), menu.TEXT,
+                      bold=True)
+                + style(value, menu.TEXT))
+        if offset == selected:
+            text = style(pad(label, DEVICE_VALUE_COL - LABEL_COL) + value,
+                         bold=True, rev=True)
+        rows[LIST_ROW + offset] = _indent(LABEL_COL) + text
+    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style)
+    return rows
+
+
 def _screen_rows(snapshot, state, style):
     if state.screen == menu.MENU:
         return _menu_rows(snapshot, state, style)
     if state.screen == menu.DEVICE:
         return _device_rows(snapshot, state, style)
+    if state.screen == menu.HELP:
+        return _help_rows(snapshot, state, style)
+    if state.screen == menu.PORT:
+        return _port_detail_rows(snapshot, state, style)
+    if state.screen == menu.SETTINGS:
+        return _settings_rows(snapshot, state, style)
     return _control_rows(snapshot, state, style)
 
 
-def _heading(state):
+def _heading(snapshot, state):
     if state.screen == menu.DEVICE:
         return TITLE_DEVICE
+    if state.screen == menu.SETTINGS:
+        return TITLE_SETTINGS
+    if state.screen == menu.HELP:
+        return TITLE_HELP
+    if state.screen == menu.PORT:
+        values = menu.readout(snapshot, state.port)
+        title = f"HUBCTL  {menu.port_label(state.port)} - {values.power_text}"
+        if values.power_on is True:
+            title += f" - data {values.data_word}"
+        return title
     return TITLE_CONTROL
 
 
 def _footer_text(snapshot, state):
-    if state.screen == menu.DEVICE:
+    if state.screen == menu.SETTINGS:
+        return FOOTER_SETTINGS
+    if state.screen in (menu.PORT, menu.DEVICE, menu.HELP):
         return FOOTER_DEVICE
     if state.screen == menu.MENU:
         return FOOTER_MENU
@@ -372,7 +460,8 @@ def render(snapshot: Snapshot, state: menu.State, width: int, height: int,
     if height <= 0:
         return []
     badge, token = _badge(snapshot)
-    lines = [_header(_heading(state), badge, token, width, style, glyph)]
+    lines = [_header(_heading(snapshot, state), badge, token,
+                     width, style, glyph)]
     if height >= 2:
         rows = _screen_rows(snapshot, state, style)
         if snapshot.identity is not None:

@@ -228,9 +228,9 @@ kbd{
 <header class="head">
   <p class="eyebrow">hubctl / one-page interface</p>
   <h1>hubctl - interface reference</h1>
-  <p class="lede">hubctl is one page: USB Control, a live list of four ports with power, data, voltage, and current. <code>m</code> opens a global menu over the port list; Device is reached from it. Enter on a port is reserved for a future monitor and does nothing in v1. The app sets no background; header and footer are reverse video, and colour appears only on state values.</p>
+  <p class="lede">hubctl is one page: USB Control, a live list of four ports with power, data, voltage, and current. <code>m</code> opens a global menu over the port list; Device, Settings and Help are reached from it. Enter on a port opens its detail page, where the monitor and advanced controls will go. The app sets no background; header and footer are reverse video, and colour appears only on state values.</p>
   <div class="meta">
-    <span>9 frames</span>
+    <span>12 frames</span>
     <span>80x24 baseline</span>
     <span>60x16 minimum</span>
     <span>terminal default</span>
@@ -458,8 +458,8 @@ kbd{
    <span class="bd">│</span>                                                                       <span class="bd">│</span>    
    <span class="bd">│</span>   <span class="dm">GLOBAL MENU</span>                                                         <span class="bd">│</span>    
    <span class="bd">│</span>   <span class="sel">Device </span>                                                             <span class="bd">│</span>    
-   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
-   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">Settings</span>                                                            <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">Help</span>                                                                <span class="bd">│</span>    
    <span class="bd">│</span>                                                                       <span class="bd">│</span>    
    <span class="bd">│</span>                                                                       <span class="bd">│</span>    
    <span class="bd">│</span>                                                                       <span class="bd">│</span>    
@@ -477,7 +477,7 @@ kbd{
    <span class="bd">│</span>   <span class="dm">last    </span><span class="ok">USB2 off - echo ok, 0x00 off, 0x08 off</span>                      <span class="bd">│</span>    
    <span class="bd">│</span><span class="bar">ENTER open   m close   q close</span><span class="bar">                                         </span><span class="bd">│</span>    </pre>
       </div>
-      <figcaption class="notes"><p>m opens the global menu in place of the port list. Header, status line, last and footer stay. GLOBAL MENU is a dim heading and Device is the selected item. Enter opens Device; m, Esc or q closes the menu. Future entries add rows.</p></figcaption>
+      <figcaption class="notes"><p>m opens the global menu in place of the port list. Header, status line, last and footer stay. GLOBAL MENU is a dim heading; Device, Settings and Help are the items and Device is selected. Enter opens the selection; m, Esc or q closes the menu. Future entries add rows.</p></figcaption>
     </figure>
 
     <figure class="term edge-ok">
@@ -492,8 +492,8 @@ kbd{
    <span class="bd">│</span>                                                   <span class="bd">│</span>    
    <span class="bd">│</span>   <span class="dm">GLOBAL MENU</span>                                     <span class="bd">│</span>    
    <span class="bd">│</span>   <span class="sel">Device </span>                                         <span class="bd">│</span>    
-   <span class="bd">│</span>                                                   <span class="bd">│</span>    
-   <span class="bd">│</span>                                                   <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">Settings</span>                                        <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">Help</span>                                            <span class="bd">│</span>    
    <span class="bd">│</span>                                                   <span class="bd">│</span>    
    <span class="bd">│</span>                                                   <span class="bd">│</span>    
    <span class="bd">│</span>                                                   <span class="bd">│</span>    
@@ -546,6 +546,128 @@ kbd{
       </div>
       <figcaption class="notes"><p>Device info, reached from the global menu. Enter, q or Esc returns to control. The last line keeps the most recent result, as on every screen. Back is the selected row.</p></figcaption>
     </figure>
+  </div>
+</section>
+
+<section class="group" aria-labelledby="g-help">
+  <div class="group-head"><h2 id="g-help">Help</h2><span>J</span></div>
+  <div class="frames">
+
+    <figure class="term edge-ok">
+      <div class="term-bar">
+        <span class="term-label"><span class="term-key">J</span>help</span>
+        <span class="term-size">80x24</span>
+      </div>
+      <div class="screen">
+<pre class="frame" role="img" aria-label="Frame J: Help page, live link, Back selected, 24 rows by 80 columns.">   <span class="bd">│</span><span class="bar">HUBCTL  HELP                                                    </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">port </span><span class="tx">/dev/ttyACM0</span>   <span class="tx">1a86:fe0c</span>   <span class="ok">live</span>                                <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">hubctl 0.1.0</span>                                                        <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">SmartUSBHub Pro 4CH terminal control</span>                                <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">j/k     </span><span class="dm">select port</span>                                                 <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">SPACE   </span><span class="dm">power on/off</span>                                                <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">d       </span><span class="dm">data on/off</span>                                                 <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">m       </span><span class="dm">menu, r refresh</span>                                             <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">ENTER   </span><span class="dm">open, q quit  </span>                                              <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="sel">Back </span>                                                               <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">last    </span><span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                      <span class="bd">│</span>    
+   <span class="bd">│</span><span class="bar">ENTER back   q back</span><span class="bar">                                                    </span><span class="bd">│</span>    </pre>
+      </div>
+      <figcaption class="notes"><p>Help, reached from the menu. Enter, q or Esc returns to control. It names the app and version and lists the keys; the last line keeps the most recent result.</p></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<section class="group" aria-labelledby="g-port">
+  <div class="group-head"><h2 id="g-port">Port detail</h2><span>K</span></div>
+  <div class="frames">
+
+    <figure class="term edge-ok">
+      <div class="term-bar">
+        <span class="term-label"><span class="term-key">K</span>port detail - off</span>
+        <span class="term-size">80x24</span>
+      </div>
+      <div class="screen">
+<pre class="frame" role="img" aria-label="Frame K: Port detail page, USB PORT 2 off, Back selected, 24 rows by 80 columns.">   <span class="bd">│</span><span class="bar">HUBCTL  USB PORT 2 - off                                        </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">port </span><span class="tx">/dev/ttyACM0</span>   <span class="tx">1a86:fe0c</span>   <span class="ok">live</span>                                <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">power       </span><span class="dm">off</span>                                                     <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">data        </span><span class="dm">-</span>                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">voltage     </span><span class="dm">(202 mV)</span>                                                <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">current     </span><span class="tx">0.00 A</span>                                                  <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="sel">Back </span>                                                               <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">last    </span><span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                      <span class="bd">│</span>    
+   <span class="bd">│</span><span class="bar">ENTER back   q back</span><span class="bar">                                                    </span><span class="bd">│</span>    </pre>
+      </div>
+      <figcaption class="notes"><p>Enter on a port opens its detail page. It names the port, shows the live reading with one labelled field per value, and leaves the space below for the monitor and advanced controls that come next. Enter, q or Esc returns to control; nothing here writes.</p></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<section class="group" aria-labelledby="g-settings">
+  <div class="group-head"><h2 id="g-settings">Settings</h2><span>L</span></div>
+  <div class="frames">
+
+    <figure class="term edge-ok">
+      <div class="term-bar">
+        <span class="term-label"><span class="term-key">L</span>settings</span>
+        <span class="term-size">80x24</span>
+      </div>
+      <div class="screen">
+<pre class="frame" role="img" aria-label="Frame L: Settings page, port row selected, 24 rows by 80 columns.">   <span class="bd">│</span><span class="bar">HUBCTL  SETTINGS                                                </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">port </span><span class="tx">/dev/ttyACM0</span>   <span class="tx">1a86:fe0c</span>   <span class="ok">live</span>                                <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="sel">port        /dev/ttyACM0</span>                                            <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="lab">poll        </span><span class="tx">1.0 s</span>                                                   <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="sel">Back </span>                                                               <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>                                                                       <span class="bd">│</span>    
+   <span class="bd">│</span>   <span class="dm">last    </span><span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                      <span class="bd">│</span>    
+   <span class="bd">│</span><span class="bar">LEFT/RIGHT change   ENTER back   q back</span><span class="bar">                                </span><span class="bd">│</span>    </pre>
+      </div>
+      <figcaption class="notes"><p>Settings, reached from the menu. j and k choose port or poll; left and right step the value. Changing the port closes the link and reopens at the new endpoint; changing poll takes effect on the next cycle. Enter, q, Esc and m return to control.</p></figcaption>
+    </figure>
 
   </div>
 </section>
@@ -593,16 +715,17 @@ kbd{
   <div class="table-wrap">
     <table class="ref">
       <thead>
-        <tr><th scope="col">Key</th><th scope="col">Control</th><th scope="col">Global menu</th><th scope="col">Device</th></tr>
+        <tr><th scope="col">Key</th><th scope="col">Control</th><th scope="col">Global menu</th><th scope="col">Settings</th><th scope="col">Device</th><th scope="col">Help</th></tr>
       </thead>
       <tbody>
-        <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>select port</td><td>-</td><td>-</td></tr>
-        <tr><td><kbd>Enter</kbd></td><td>- (reserved)</td><td>open item</td><td>back</td></tr>
-        <tr><td><kbd>Space</kbd></td><td>toggle power</td><td>-</td><td>-</td></tr>
-        <tr><td><kbd>d</kbd></td><td>toggle data</td><td>-</td><td>-</td></tr>
-        <tr><td><kbd>m</kbd></td><td>open menu</td><td>close</td><td>back to control</td></tr>
-        <tr><td><kbd>r</kbd></td><td>refresh</td><td>refresh</td><td>refresh</td></tr>
-        <tr><td><kbd>q</kbd> / <kbd>Esc</kbd></td><td>quit</td><td>close</td><td>back</td></tr>
+        <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>select port</td><td>select item</td><td>select setting</td><td>-</td><td>-</td></tr>
+        <tr><td><kbd>Left</kbd> / <kbd>Right</kbd></td><td>-</td><td>-</td><td>change value</td><td>-</td><td>-</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>open port detail</td><td>open item</td><td>back</td><td>back</td><td>back</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>toggle power</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+        <tr><td><kbd>d</kbd></td><td>toggle data</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+        <tr><td><kbd>m</kbd></td><td>open menu</td><td>close</td><td>back to control</td><td>back to control</td><td>back to control</td></tr>
+        <tr><td><kbd>r</kbd></td><td>refresh</td><td>refresh</td><td>refresh</td><td>refresh</td><td>refresh</td></tr>
+        <tr><td><kbd>q</kbd> / <kbd>Esc</kbd></td><td>quit</td><td>close</td><td>back</td><td>back</td><td>back</td></tr>
       </tbody>
     </table>
   </div>

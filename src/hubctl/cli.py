@@ -9,8 +9,7 @@ import time
 from .app.controller import Controller
 from .app.term import color_supported, utf8_supported
 from .app.tui import run
-from .constants import POLL_INTERVAL_S
-from .hal.registry import open_first
+from .constants import POLL_INTERVAL_S, POLL_MAX_S, POLL_MIN_S
 
 
 def _trace_writer(path):
@@ -39,15 +38,15 @@ def main(argv=None) -> int:
         print("hubctl needs a terminal; run it from an interactive shell",
               file=sys.stderr)
         return 2
-    if args.poll_interval < 0.2 or args.poll_interval > 10.0:
+    if args.poll_interval < POLL_MIN_S or args.poll_interval > POLL_MAX_S:
         parser.error("--poll-interval must be between 0.2 and 10.0")
 
     handle = None
     trace = None
     if args.trace:
         handle, trace = _trace_writer(args.trace)
-    open_fn = lambda: open_first(args.port, trace=trace)
-    controller = Controller(open_fn, poll_interval=args.poll_interval)
+    controller = Controller(poll_interval=args.poll_interval, port=args.port,
+                            trace=trace)
     try:
         return run(controller,
                    color=not args.no_color and color_supported(),
