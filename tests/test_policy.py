@@ -10,6 +10,7 @@ from hubctl.constants import (
     AUTO_MAX_RETRIES,
     AUTO_NORMAL_SAMPLES,
     AUTO_OVER_SAMPLES,
+    AUTO_UNDER_SAMPLES,
 )
 from hubctl.hal.base import ChannelReading, LinkState, Mode, Snapshot, Status
 
@@ -123,6 +124,56 @@ class GateTests(unittest.TestCase):
         self.assertIsNone(decision)
 
 
+class UndercurrentTests(unittest.TestCase):
+    def rule(self, held=False):
+        rule = auto(policy.Policy(enabled=True, under_ma=100))
+        if held:
+            rule.state[1].manual_until = MONO + 1
+        return rule
+
+    def test_one_sample_does_not_cut(self):
+        result, decision = policy.decide(snapshot(current=20), self.rule(),
+                                         {1: True}, MONO, at(12))
+        self.assertIsNone(decision)
+        self.assertEqual(result.state[1].under_at, 1)
+
+    def test_two_samples_cut_and_name_the_current(self):
+        rule = self.rule()
+        rule.state[1].under_at = AUTO_UNDER_SAMPLES - 1
+        result, decision = policy.decide(snapshot(current=20), rule,
+                                         {1: True}, MONO, at(12))
+        self.assertEqual(decision.text, "USB1 off - auto undercurrent 0.02 A")
+        self.assertFalse(decision.on)
+        self.assertEqual(decision.port, 1)
+        self.assertEqual(result.state[1].cut_at, MONO)
+
+    def test_a_sample_at_the_threshold_resets_the_counter(self):
+        rule = self.rule()
+        rule.state[1].under_at = 1
+        result, _decision = policy.decide(snapshot(current=100), rule,
+                                          {1: True}, MONO, at(12))
+        self.assertEqual(result.state[1].under_at, 0)
+
+    def test_the_cycle_action_leaves_the_port_to_the_pending_on(self):
+        rule = auto(policy.Policy(enabled=True, under_ma=100,
+                                  under_action=policy.ACTION_CYCLE))
+        rule.state[1].under_at = AUTO_UNDER_SAMPLES - 1
+        result, decision = policy.decide(snapshot(current=20), rule,
+                                         {1: True}, MONO, at(12))
+        self.assertFalse(decision.on)
+        self.assertEqual(decision.text, "USB1 off - auto undercurrent 0.02 A")
+        self.assertIsNone(result.state[1].cut_at)
+        self.assertEqual(result.state[1].pending_on_at,
+                         MONO + AUTO_CYCLE_OFF_S)
+
+    def test_the_manual_hold_suppresses_the_cut(self):
+        rule = self.rule(held=True)
+        rule.state[1].under_at = 1
+        _result, decision = policy.decide(snapshot(current=20), rule,
+                                          {1: True}, MONO, at(12))
+        self.assertIsNone(decision)
+
+
 class OvercurrentTests(unittest.TestCase):
     def rule(self, held=False):
         rule = auto(policy.Policy(enabled=True, overcurrent_ma=1000))
@@ -155,6 +206,18 @@ class OvercurrentTests(unittest.TestCase):
             snapshot(current=1620), rule, {}, MONO, at(12))
         self.assertIsNotNone(decision)
         self.assertFalse(decision.on)
+
+    def test_the_cycle_action_leaves_the_port_to_the_pending_on(self):
+        rule = auto(policy.Policy(enabled=True, overcurrent_ma=1000,
+                                  over_action=policy.ACTION_CYCLE))
+        rule.state[1].over_at = AUTO_OVER_SAMPLES - 1
+        result, decision = policy.decide(snapshot(current=1620), rule, {},
+                                         MONO, at(12))
+        self.assertFalse(decision.on)
+        self.assertEqual(decision.text, "USB1 off - auto overcurrent 1.62 A")
+        self.assertIsNone(result.state[1].cut_at)
+        self.assertEqual(result.state[1].pending_on_at,
+                         MONO + AUTO_CYCLE_OFF_S)
 
     def test_a_normal_sample_resets_the_over_counter(self):
         rule = self.rule()
@@ -487,9 +550,15 @@ class StepTests(unittest.TestCase):
         self.assertEqual(policy.step(ten, "cycle", 1).cycle_s, 1800)
 
         over = policy.Policy(overcurrent_ma=2000)
-        self.assertIsNone(policy.step(over, "overcurrent", 1).overcurrent_ma)
-        self.assertEqual(policy.step(policy.Policy(), "overcurrent", 1)
+        self.assertIsNone(policy.step(over, "over", 1).overcurrent_ma)
+        self.assertEqual(policy.step(policy.Policy(), "over", 1)
                          .overcurrent_ma, 500)
+        self.assertEqual(policy.step(policy.Policy(), "under", 1).under_ma, 50)
+        self.assertEqual(policy.step(policy.Policy(), "over_action", 1)
+                         .over_action, policy.ACTION_CYCLE)
+        self.assertEqual(policy.step(policy.Policy(
+            under_action=policy.ACTION_CYCLE), "under_action", 1)
+            .under_action, policy.ACTION_CUT)
 
         self.assertEqual(policy.step(policy.Policy(), "retry", 1).retry_s, 10)
         self.assertEqual(policy.step(policy.Policy(), "recovery", 1)
@@ -514,6 +583,26 @@ class StepTests(unittest.TestCase):
     def test_the_hours_do_nothing_while_the_schedule_is_off(self):
         rule = policy.Policy()
         self.assertEqual(policy.step(rule, "from", 1), rule)
+
+    def test_typed_values_are_parsed_and_clamped(self):
+        rule = policy.Policy(schedule=(8 * 60, 18 * 60))
+        self.assertEqual(policy.set_value(rule, "cycle", "45").cycle_s, 2700)
+        self.assertEqual(policy.set_value(rule, "over", "1.8")
+                         .overcurrent_ma, 1800)
+        self.assertEqual(policy.set_value(rule, "retry", "20").retry_s, 20)
+        self.assertEqual(policy.set_value(rule, "recovery", "2").recovery_s,
+                         120)
+        self.assertEqual(policy.set_value(rule, "from", "6").schedule,
+                         (6 * 60, 18 * 60))
+        self.assertEqual(policy.set_value(rule, "to", "22").schedule,
+                         (8 * 60, 22 * 60))
+        self.assertEqual(policy.set_value(rule, "cycle", "999").cycle_s, 3600)
+        self.assertEqual(policy.set_value(rule, "retry", "0").retry_s, 1)
+        self.assertEqual(policy.set_value(rule, "over", "9")
+                         .overcurrent_ma, 4000)
+        self.assertIsNone(policy.set_value(rule, "cycle", ""))
+        self.assertIsNone(policy.set_value(rule, "cycle", "abc"))
+        self.assertIsNone(policy.set_value(policy.Policy(), "from", "8"))
 
 
 if __name__ == "__main__":

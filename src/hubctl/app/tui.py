@@ -57,6 +57,12 @@ def _execute(controller: Controller, action: menu.Action) -> None:
         field, delta = action.value
         rule = controller.auto().policies.get(action.port, policy.Policy())
         controller.set_policy(action.port, policy.step(rule, field, delta))
+    elif action.kind == menu.SET_POLICY_VALUE:
+        field, text = action.value
+        rule = controller.auto().policies.get(action.port, policy.Policy())
+        typed = policy.set_value(rule, field, text)
+        if typed is not None:
+            controller.set_policy(action.port, typed)
 
 
 def _loop(controller: Controller, terminal: Terminal, color: bool,

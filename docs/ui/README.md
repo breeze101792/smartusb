@@ -1,7 +1,7 @@
 # UI documentation
 
 One page, one interaction model: a keyboard-driven terminal control page drawn
-with ANSI control sequences, with a global menu that opens over it. The mockup is
+with ANSI control sequences, with a menu that opens over it. The mockup is
 the visual truth.
 
 | ID | Document | Purpose | Status |

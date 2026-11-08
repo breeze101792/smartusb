@@ -97,4 +97,5 @@ class Terminal:
                 return keys[sequence]
             return "escape" if sequence == b"" else "ignore"
         char = raw.decode("latin1")
-        return {" ": "space", "\x03": "ctrl-c", "\r": "enter", "\n": "enter"}.get(char, char)
+        return {" ": "space", "\x03": "ctrl-c", "\r": "enter", "\n": "enter",
+                "\x7f": "backspace", "\x08": "backspace"}.get(char, char)

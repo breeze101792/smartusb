@@ -8,11 +8,13 @@ from ..constants import MAX_CHANNELS, POLL_CHOICES_S
 from ..hal.base import ChannelReading, LinkState, Snapshot
 from . import policy
 
-# Screens. The control page is the only page; the menu opens over it.
+# Screens. Every page shares one frame; the menu opens over the control page.
 CONTROL = "control"
 PORT = "port"
 MENU = "menu"
 POLICY = "policy"
+CURRENT = "current"
+AUTOHELP = "autohelp"
 DEVICE = "device"
 SETTINGS = "settings"
 HELP = "help"
@@ -30,6 +32,7 @@ SET_PORT = "set-port"
 SET_POLL = "set-poll"
 TOGGLE_PAUSE = "toggle-pause"
 SET_POLICY = "set-policy"
+SET_POLICY_VALUE = "set-policy-value"
 
 # Style tokens, docs/ui/menu.md section 7.
 TEXT = "text"
@@ -43,12 +46,27 @@ LABEL_DEVICE = "Device"
 LABEL_SETTINGS = "Settings"
 LABEL_HELP = "Help"
 LABEL_BACK = "Back"
-MENU_HEADING = "GLOBAL MENU"
 PORT_LABEL = "USB PORT"
 AUTO_MARKER = "A"
 AUTO_NOTE = "rules clear when hubctl exits"
 AUTO_TITLE = "HUBCTL  AUTO"
 POLICY_ROWS = policy.POLICY_FIELDS
+CURRENT_ROWS = policy.CURRENT_FIELDS
+
+# Fields with a typed value, and the unit the editor shows beside it.
+EDIT_UNITS = {"cycle": "min", "over": "A", "under": "A", "retry": "s",
+              "recovery": "min"}
+EDIT_LIMITS = {
+    "cycle": policy.CYCLE_LIMITS,
+    "over": policy.OVERCURRENT_LIMITS,
+    "under": policy.UNDERCURRENT_LIMITS,
+    "retry": policy.RETRY_LIMITS,
+    "recovery": policy.RECOVERY_LIMITS,
+    "from": (0, policy.HOURS - 1),
+    "to": (0, policy.HOURS - 1),
+}
+EDIT_CHARS = "0123456789."
+EDIT_MAX_LEN = 4
 
 DEVICE_FIELD_LABELS = ("ports", "product", "firmware", "hardware", "address",
                        "buttons", "restore")
@@ -70,7 +88,9 @@ class State:
     settings_index: int = 0
     auto_index: int = 0
     policy_index: int = 0
+    current_index: int = 0
     port: int = 0
+    edit: str | None = None
 
 
 @dataclass(frozen=True)
@@ -123,7 +143,7 @@ def items(state: State) -> list[Item]:
         return [Item(LABEL_DEVICE, OPEN_DEVICE),
                 Item(LABEL_SETTINGS, OPEN_SETTINGS),
                 Item(LABEL_HELP, OPEN_HELP)]
-    if state.screen in (PORT, DEVICE, SETTINGS, HELP, POLICY):
+    if state.screen in (PORT, DEVICE, SETTINGS, HELP, POLICY, CURRENT):
         return [Item(LABEL_BACK, BACK)]
     return []
 
@@ -136,6 +156,8 @@ def index(snapshot: Snapshot, state: State) -> int:
         return max(0, min(state.settings_index, len(SETTINGS_ROWS) - 1))
     if state.screen == POLICY:
         return max(0, min(state.policy_index, len(POLICY_ROWS)))
+    if state.screen == CURRENT:
+        return max(0, min(state.current_index, len(CURRENT_ROWS)))
     if state.screen in (PORT, DEVICE, HELP):
         return 0
     count = port_count(snapshot)
@@ -147,7 +169,13 @@ def handle_key(snapshot: Snapshot, state: State,
     """Return the new state and the action the key asks the app to run."""
     if key == "ctrl-c":
         return state, Action(QUIT)
+    if state.edit is not None:
+        return _edit_key(state, key)
     if key in BACK_KEYS:
+        return _back(state)
+    if key == "?" and state.screen in (POLICY, CURRENT):
+        return replace(state, screen=AUTOHELP), None
+    if state.screen == AUTOHELP and key in ("enter", "space", "?"):
         return _back(state)
     if key == "r":
         return state, Action(REFRESH)
@@ -156,6 +184,10 @@ def handle_key(snapshot: Snapshot, state: State,
     if key in PREVIOUS_KEYS:
         return _move(snapshot, state, -1), None
     if key == "enter":
+        if state.screen == POLICY:
+            return _policy_enter(state)
+        if state.screen == CURRENT:
+            return _current_enter(state)
         return _enter(snapshot, state)
     if key == "m":
         return _menu(state)
@@ -165,14 +197,20 @@ def handle_key(snapshot: Snapshot, state: State,
             return state, None
         return replace(state, screen=POLICY, port=index(snapshot, state) + 1,
                        policy_index=0), None
-    if key == "p" and state.screen in (CONTROL, POLICY):
+    if key == "p" and state.screen in (CONTROL, POLICY, CURRENT):
         return state, Action(TOGGLE_PAUSE)
     if state.screen == SETTINGS and key in ("left", "right"):
         return _change(snapshot, state, 1 if key == "right" else -1)
-    if state.screen == POLICY and key in ("left", "right"):
+    if state.screen in (POLICY, CURRENT) and key in ("left", "right"):
         return _step(state, 1 if key == "right" else -1)
     if key == "space":
-        return _write(snapshot, state, TOGGLE_POWER)
+        if state.screen == CONTROL:
+            return _write(snapshot, state, TOGGLE_POWER)
+        if state.screen == SETTINGS:
+            return _change(snapshot, state, 1)
+        if state.screen in (POLICY, CURRENT):
+            return _space(state)
+        return _enter(snapshot, state)
     if key == "d":
         return _write(snapshot, state, TOGGLE_DATA)
     return state, None
@@ -266,6 +304,8 @@ def _back(state: State) -> tuple[State, Action | None]:
     """q and Esc quit on control and only ever go back elsewhere."""
     if state.screen == CONTROL:
         return state, Action(QUIT)
+    if state.screen in (CURRENT, AUTOHELP):
+        return replace(state, screen=POLICY), None
     return replace(state, screen=CONTROL, menu_index=0, port=0), None
 
 
@@ -327,15 +367,115 @@ def _move(snapshot: Snapshot, state: State, delta: int) -> State:
         count = len(POLICY_ROWS) + 1
         return replace(state,
                        policy_index=(index(snapshot, state) + delta) % count)
+    if state.screen == CURRENT:
+        count = len(CURRENT_ROWS) + 1
+        return replace(state,
+                       current_index=(index(snapshot, state) + delta) % count)
     return state
+
+
+def _rows(state: State) -> tuple[str, ...]:
+    return CURRENT_ROWS if state.screen == CURRENT else POLICY_ROWS
+
+
+def _position(state: State) -> int:
+    if state.screen == CURRENT:
+        return min(state.current_index, len(CURRENT_ROWS))
+    return min(state.policy_index, len(POLICY_ROWS))
+
+
+def _policy_enter(state: State) -> tuple[State, Action | None]:
+    """Enter opens the current sub-page, edits a value, or backs out."""
+    position = _position(state)
+    if position == len(POLICY_ROWS):
+        return _back(state)
+    if POLICY_ROWS[position] == "current":
+        return replace(state, screen=CURRENT, current_index=0), None
+    return _edit_start(state)
+
+
+def _current_enter(state: State) -> tuple[State, Action | None]:
+    if _position(state) == len(CURRENT_ROWS):
+        return _back(state)
+    return _edit_start(state)
+
+
+def _space(state: State) -> tuple[State, Action | None]:
+    """Space steps the selected value, or leaves when Back is selected."""
+    if _position(state) == len(_rows(state)):
+        return _back(state)
+    return _step(state, 1)
+
+
+def _edit_start(state: State) -> tuple[State, Action | None]:
+    """Enter opens the editor on a numeric row and toggles a boolean row."""
+    field = _rows(state)[_position(state)]
+    if field in ("enabled", "schedule", "over_action", "under_action"):
+        return _step(state, 1)
+    return replace(state, edit=""), None
+
+
+def _edit_key(state: State, key: str) -> tuple[State, Action | None]:
+    """Digits type, Enter commits, Esc cancels, other keys are ignored."""
+    field = _rows(state)[_position(state)]
+    if key == "enter":
+        if state.edit == "":
+            return replace(state, edit=None), None
+        if not edit_valid(field, state.edit):
+            return state, None
+        return (replace(state, edit=None),
+                Action(SET_POLICY_VALUE, port=state.port,
+                       value=(field, state.edit)))
+    if key == "escape":
+        return replace(state, edit=None), None
+    if key == "backspace":
+        return replace(state, edit=state.edit[:-1]), None
+    if len(key) == 1 and key in EDIT_CHARS:
+        if len(state.edit) >= EDIT_MAX_LEN:
+            return state, None
+        if key == "." and (EDIT_UNITS.get(field) != "A" or "." in state.edit):
+            return state, None
+        if not _edit_accepts(field, state.edit, key):
+            return state, None
+        return replace(state, edit=state.edit + key), None
+    return state, None
+
+
+def _edit_value(field: str, text: str):
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def edit_valid(field: str, text: str) -> bool:
+    """The buffer holds a number the field accepts at commit time."""
+    value = _edit_value(field, text)
+    if value is None:
+        return False
+    low, high = EDIT_LIMITS[field]
+    return low <= value <= high
+
+
+def _edit_accepts(field: str, text: str, char: str) -> bool:
+    """A keystroke is kept only while the number stays under the maximum."""
+    value = _edit_value(field, text + char)
+    return value is not None and value <= EDIT_LIMITS[field][1]
+
+
+def edit_text(field: str, text: str) -> str:
+    """The value cell while the row is being typed into."""
+    body = text or "_"
+    unit = EDIT_UNITS.get(field)
+    return f"{body} {unit}" if unit else body
 
 
 def _step(state: State, delta: int) -> tuple[State, Action | None]:
     """Left and right step the selected policy value."""
-    position = max(0, min(state.policy_index, len(POLICY_ROWS)))
-    if position >= len(POLICY_ROWS) or state.port < 1:
+    position = _position(state)
+    if position >= len(_rows(state)) or state.port < 1:
         return state, None
-    field = POLICY_ROWS[position]
+    field = _rows(state)[position]
     return state, Action(SET_POLICY, port=state.port, value=(field, delta))
 
 
@@ -368,10 +508,22 @@ def policy_row(rule: policy.Policy,
         return ("enabled", *_on_off(rule.enabled))
     if field == "cycle":
         return ("cycle", *_minutes(rule.cycle_s))
-    if field == "overcurrent":
+    if field == "current":
+        return ("current", *_current_summary(rule))
+    if field == "over":
         if rule.overcurrent_ma is None:
-            return ("overcurrent", "off", DIM)
-        return ("overcurrent", f"{rule.overcurrent_ma / 1000:.1f} A", TEXT)
+            return ("over", "off", DIM)
+        return ("over", f"{rule.overcurrent_ma / 1000:.1f} A", TEXT)
+    if field == "over_action":
+        token = DIM if rule.overcurrent_ma is None else TEXT
+        return ("over action", rule.over_action, token)
+    if field == "under":
+        if rule.under_ma is None:
+            return ("under", "off", DIM)
+        return ("under", f"{rule.under_ma / 1000:.2f} A", TEXT)
+    if field == "under_action":
+        token = DIM if rule.under_ma is None else TEXT
+        return ("under action", rule.under_action, token)
     if field == "retry":
         if rule.retry_s is None:
             return ("retry", "off", DIM)
@@ -385,6 +537,17 @@ def policy_row(rule: policy.Policy,
         return (field, "--", DIM)
     minutes = window[0] if field == "from" else window[1]
     return (field, f"{minutes // 60:02d}", TEXT)
+
+
+def _current_summary(rule: policy.Policy) -> tuple[str, str]:
+    parts = []
+    if rule.overcurrent_ma is not None:
+        parts.append(f"{rule.overcurrent_ma / 1000:.1f} A {rule.over_action}")
+    if rule.under_ma is not None:
+        parts.append(f"{rule.under_ma / 1000:.2f} A {rule.under_action}")
+    if not parts:
+        return "off", DIM
+    return " / ".join(parts), TEXT
 
 
 def _on_off(value: bool) -> tuple[str, str]:

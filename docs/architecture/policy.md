@@ -44,6 +44,7 @@ class Policy:
     enabled: bool = False
     cycle_s: int | None = None           # power-cycle an ON port
     overcurrent_ma: int | None = None    # cut above this, two samples
+    under_ma: int | None = None          # cut below this, two samples
     retry_s: int | None = None           # restore after a cut; capped
     recovery_s: int | None = None        # cycle when the device is gone
     schedule: tuple[int, int] | None = None  # minutes of day, from/to
@@ -95,25 +96,28 @@ port. Ports are considered in ascending order, so a tie is deterministic.
    consecutive polls → off. A safe cut ignores the manual hold. Store
    `cut_at` and `retries`. The counter resets after three normal samples while
    the port is ON; it is not cleared while the port is off.
-2. **Overcurrent retry.** Port OFF with `cut_at` set and `retry_s` set, at most
+2. **Under-current cut.** Port ON, current below `under_ma` for two consecutive
+   polls → off. This is not a safety cut, so the manual hold suppresses it. It
+   stores `cut_at` and feeds the retry rule like any other cut.
+3. **Overcurrent retry.** Port OFF with `cut_at` set and `retry_s` set, at most
    three consecutive retries, `mono >= cut_at + retry_s` → on. A retry is
    suppressed by the manual hold. After the third retry the rule stops until
    the policy is re-armed (enable toggled off and on, or a schedule edge).
-3. **Recovery.** Port ON with data on, no downstream device seen by this host
+4. **Recovery.** Port ON with data on, no downstream device seen by this host
    for `recovery_s` → cycle: off now, on when the next poll is at least
    `AUTO_CYCLE_OFF_S` later. The USB map is the signal, not the current: a
    current floor sits inside the ±50 mA offset. This rule assumes the DATA hub
    is connected to this host; if it is not, leave it off.
-4. **Cycle.** Port ON, `mono - last_cycle_at >= cycle_s` → off now, on after
+5. **Cycle.** Port ON, `mono - last_cycle_at >= cycle_s` → off now, on after
    the off phase. A cycle never turns an off port on. `last_cycle_at` is set at
    the off write.
-5. **Schedule edges.** Inside the `from`..`to` window (wrap when `to < from`;
+6. **Schedule edges.** Inside the `from`..`to` window (wrap when `to < from`;
    `from == to` means never) with `schedule_on` false → on. Outside with
    `schedule_on` true → off. Edge-triggered on wall time. A manual change
    between edges is not undone. A backward wall jump of more than 60 s skips
    one evaluation and resyncs. Enabling the schedule uses the default window
    08:00 to 18:00; while the schedule is off, `from` and `to` read `--`.
-6. **Pending on.** A port left off by a cycle or a recovery is turned on when
+7. **Pending on.** A port left off by a cycle or a recovery is turned on when
    `mono >= pending_on_at`. Cancelled by any gate, by a schedule edge and by a
    poll change.
 
@@ -153,6 +157,7 @@ runs. The off phase is "at least 2 s", measured in polls.
 | Rule | Text |
 | --- | --- |
 | overcurrent cut | `USB2 off - auto overcurrent 1.62 A` |
+| under-current cut | `USB2 off - auto undercurrent 0.02 A` |
 | overcurrent retry | `USB2 on - auto retry 1 of 3` |
 | cycle off | `USB2 off - auto cycle 10 min` |
 | cycle on | `USB2 on - auto cycle` |
@@ -168,7 +173,8 @@ has passed.
 
 | Element | Rule |
 | --- | --- |
-| Status row 3 | append `auto <n>` when a policy is enabled, `auto paused`, or `auto off - poll too long`; omit the field when none apply |
+| Status text | append `auto <n>` when a policy is enabled, `auto paused`, or `auto off - poll too long`; omit the field when none apply |
+| Status placement | every page draws the status on the `last` row, right-aligned, and never moves it; the status sheds the poll then the mode to keep ten columns for the action, and stays on row 3 only when there is no device |
 | Narrow widths | drop `poll <n> s` first, never the auto field |
 | Port rows | `A` at column 3 for an enabled port |
 | Policy page | dim row 14: `rules clear when hubctl exits` |

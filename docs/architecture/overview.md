@@ -280,10 +280,10 @@ downstream sysfs device map, non-interactive CLI output, mouse.
 | Codec matches documented and captured frames | vector tests, bad checksum resync, truncation | host — 8 pass |
 | Driver: identity, masks, reads, writes, rejection, silence, allow-list | pty fake device | host — 10 pass |
 | Controller: poll schedule, write verify, staleness, reconnect, settings, `set_power`, automatic writes | fake driver, injectable clock | host — 41 pass |
-| Menu model: port list, port detail, global menu, Settings and policy, key routing | pure `menu` assertions | host — 39 pass |
-| Render: frame, states, width/height sweep, clipping, selection, sixteen mockup frames | pure `render()` assertions | host — 46 pass |
-| Automatic control: rules, priority, gates, timers, retry cap, schedule | pure `decide()` truth tables | host — 54 pass |
-| TUI loop: screens, `a`/`p`, policy stepping, usb map, per-key repeat guard | fake controller, terminal and clock | host — 25 pass |
+| Menu model: port list, port detail, menu, Settings and policy, key routing | pure `menu` assertions | host — 44 pass |
+| Render: frame, states, width/height sweep, clipping, selection, sixteen mockup frames | pure `render()` assertions | host — 55 pass |
+| Automatic control: rules, priority, gates, timers, retry cap, schedule, typed values, under-current cut, per-trigger actions | pure `decide()` truth tables | host — 61 pass |
+| TUI loop: screens, `a`/`p`, policy stepping and typing, usb map, per-key repeat guard | fake controller, terminal and clock | host — 26 pass |
 | Discovery filters `fe0c` and rejects `8091` | fake sysfs tree | host — 2 pass |
 | Key decode: arrows, lone Esc, unknown sequences ignored, plain keys | raw pipe fd | host — 4 pass |
 | Downstream USB map: hub discovery, port child, empty port, missing tree | fake sysfs tree | host — 4 pass |

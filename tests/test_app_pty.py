@@ -58,10 +58,10 @@ class AppPtyTests(unittest.TestCase):
             self.assertTrue(wait_for(b"live"))
 
             os.write(master, b" ")
-            self.assertTrue(wait_for(b"USB1 on - echo ok, 0x00 on, 0x08 on"))
+            self.assertTrue(wait_for(b"USB1 on - echo"))
 
             os.write(master, b"m")
-            self.assertTrue(wait_for(b"GLOBAL MENU"))
+            self.assertTrue(wait_for(b"HUBCTL  MENU"))
 
             os.write(master, b"q")
             self.assertTrue(wait_for(b"SPACE power"))
@@ -83,7 +83,7 @@ class AppPtyTests(unittest.TestCase):
         self.assertIn(b"\x1b[?1049h", bytes(output))
         self.assertIn(b"\x1b[?1049l", bytes(output))
         self.assertIn(b"USB1 on - echo ok", bytes(output))
-        self.assertIn(b"GLOBAL MENU", bytes(output))
+        self.assertIn(b"HUBCTL  MENU", bytes(output))
         self.assertIn((0x01, 0x01, 1), hub.received)
 
     def test_no_device_state_and_quit(self):

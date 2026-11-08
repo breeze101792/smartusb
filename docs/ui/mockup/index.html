@@ -228,9 +228,9 @@ kbd{
 <header class="head">
   <p class="eyebrow">hubctl / one-page interface</p>
   <h1>hubctl - interface reference</h1>
-  <p class="lede">hubctl is one page: USB Control, a live list of four ports with power, data, voltage, current and watts. <code>m</code> opens a global menu over the port list; Device, Settings and Help are reached from it; <code>a</code> opens the selected port's policy. Enter on a port opens its detail page, with the downstream device when this host sees it. Automatic control is per port: cycle, overcurrent cut, low-current recovery and a daily schedule; it writes only while the link is live and the mode is normal. The app sets no background; header and footer are reverse video, and colour appears only on state values.</p>
+  <p class="lede">hubctl is one page: USB Control, a live list of four ports with power, data, voltage, current and watts. <code>m</code> opens a menu over the port list; Device, Settings and Help are reached from it; <code>a</code> opens the selected port's policy. Enter on a port opens its detail page, with the downstream device when this host sees it. Automatic control is per port: cycle, over- and under-current trips that each cut or cycle, low-current recovery and a daily schedule; it writes only while the link is live and the mode is normal. The app sets no background; header and footer are reverse video, and colour appears only on state values.</p>
   <div class="meta">
-    <span>16 frames</span>
+    <span>18 frames</span>
     <span>80x24 baseline</span>
     <span>60x16 minimum</span>
     <span>terminal default</span>
@@ -251,8 +251,6 @@ kbd{
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame A: USB Control, live link, four ports, USB PORT 2 selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                                    </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>                             <span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">USB PORT 1  </span><span class="ok">ON  </span>      <span class="ok">data on </span>      4.61 V         0.00 A       0.00 W     <span class="bd">│</span>
 <span class="bd">│</span>   <span class="sel">USB PORT 2  off       -             (202 mV)       0.00 A       0.00 W</span>     <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">USB PORT 3  </span><span class="ok">ON  </span>      <span class="dm">data off</span>      5.02 V         0.21 A       1.05 W     <span class="bd">│</span>
@@ -271,10 +269,12 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok, 0x00 off, 0x08 off</span>                             <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="bar">SPACE power   d data   a auto   p pause   q quit                              </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>USB Control is the app. Four ports with live detail; USB PORT 2 is selected. j/k select (wrap), Space powers, d switches data, m opens the global menu, q quits. Green marks ON, data on, and live; labels are bold default text. Enter on a port is reserved and does nothing in v1.</p></figcaption>
+      <figcaption class="notes"><p>USB Control is the app. Four ports with live detail; USB PORT 2 is selected. j/k select (wrap), Space powers, d switches data, m opens the menu, q quits. Green marks ON, data on, and live; labels are bold default text. Enter on a port is reserved and does nothing in v1.</p></figcaption>
     </figure>
 
     <figure class="term edge-warn">
@@ -284,8 +284,6 @@ kbd{
       </div>
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame D: USB Control, stale link, values dimmed, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                             </span> stale 2.3 s <span class="bar"> </span><span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="wn">stale 2.3 s</span><span class="dm">   poll 1.0 s</span>                      <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">USB PORT 1  </span><span class="dm">ON  </span>      <span class="dm">data on </span>      <span class="dm">4.61 V   </span>      <span class="dm">0.00 A </span>      <span class="dm">0.00 W</span>     <span class="bd">│</span>
 <span class="bd">│</span>   <span class="sel">USB PORT 2  off       -             (202 mV)       0.00 A       0.00 W</span>     <span class="bd">│</span>
@@ -305,10 +303,12 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok, 0x00 off, 0x08 off</span>                             <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok, 0</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="wn">stale 2.3 s</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="bar">SPACE power   d data   a auto   p pause   q quit                              </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>One poll is late. Values keep their last reading and drop to dim while the header and status line show the age. All keys still work; the footer is unchanged.</p></figcaption>
+      <figcaption class="notes"><p>One poll is late. Values keep their last reading and drop to dim while the header and the last line show the age. All keys still work; the footer is unchanged.</p></figcaption>
     </figure>
 
     <figure class="term edge-err">
@@ -318,8 +318,6 @@ kbd{
       </div>
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame E: USB Control, lost link, all fields unknown, USB PORT 2 selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                        </span> lost - retry 4 s <span class="bar"> </span><span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="er">lost</span><span class="dm">   poll 1.0 s</span>                             <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">USB PORT 1  </span><span class="dm">?   </span>      <span class="dm">?       </span>      <span class="dm">?        </span>      <span class="dm">?      </span>      <span class="dm">?     </span>     <span class="bd">│</span>
 <span class="bd">│</span>   <span class="sel">USB PORT 2  ?         ?             ?              ?            ?     </span>     <span class="bd">│</span>
@@ -339,7 +337,9 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="er">USB2 off - no reply, link lost</span>                                     <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="er">USB2 off - no r</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="er">lost</span><span class="dm">   poll 1.0 s</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="bar">r retry   a auto   p pause   q quit                                           </span><span class="bd">│</span></pre>
       </div>
       <figcaption class="notes"><p>The link is lost. Every reading becomes <code>?</code>, but USB PORT 2 stays selected and the list stays navigable. Space and d are still offered; r retries, m opens the menu, q quits.</p></figcaption>
@@ -351,9 +351,7 @@ kbd{
         <span class="term-size">80x24</span>
       </div>
       <div class="screen">
-<pre class="frame" role="img" aria-label="Frame F: USB Control, interlock banner on row 4, live ports, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                               </span> interlock <span class="bar"> </span><span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   <span class="wn">interlock</span>   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>                          <span class="bd">│</span>
+<pre class="frame" role="img" aria-label="Frame F: USB Control, interlock banner on row 2, live ports, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                               </span> interlock <span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>   <span class="wn">! interlock - switching disabled. Hold CH1 3 s, then r.</span>                    <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">USB PORT 1  </span><span class="ok">ON  </span>      <span class="ok">data on </span>      4.61 V         0.00 A       0.00 W     <span class="bd">│</span>
 <span class="bd">│</span>   <span class="sel">USB PORT 2  off       -             (202 mV)       0.00 A       0.00 W</span>     <span class="bd">│</span>
@@ -373,7 +371,9 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="er">interlock - 0x01 rejected</span>                                          <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="er">interlock - </span>   <span class="dm">port </span>/dev/ttyACM0   <span class="wn">interlock</span>   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="bar">SPACE power   d data   a auto   p pause   q quit                              </span><span class="bd">│</span></pre>
       </div>
       <figcaption class="notes"><p>The hub reports interlock. The amber banner names the CH1 button on the unit; the ports stay live and the footer is unchanged, but switching is refused. Hold CH1 for 3 s, then press r to refresh.</p></figcaption>
@@ -421,8 +421,6 @@ kbd{
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame H: USB Control at the minimum size, 16 rows by 60 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>          <span class="bd">│</span>
-<span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span>  <span class="lab">USB PORT 1  </span><span class="ok">ON  </span>  <span class="ok">data on </span>  4.61 V     0.00 A   0.00 W  <span class="bd">│</span>
 <span class="bd">│</span>  <span class="sel">USB PORT 2  off   -         (202 mV)   0.00 A   0.00 W</span>  <span class="bd">│</span>
 <span class="bd">│</span>  <span class="lab">USB PORT 3  </span><span class="ok">ON  </span>  <span class="dm">data off</span>  5.02 V     0.21 A   1.05 W  <span class="bd">│</span>
@@ -433,10 +431,12 @@ kbd{
 <span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">last</span>    <span class="ok">USB2 off - echo ok, 0x00 off, 0x08 off</span>          <span class="bd">│</span>
+<span class="bd">│</span>                                                          <span class="bd">│</span>
+<span class="bd">│</span>                                                          <span class="bd">│</span>
+<span class="bd">│</span>  <span class="dm">last</span>    <span class="ok">USB2 off -</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span>  <span class="bd">│</span>
 <span class="bd">│</span><span class="bar">SPACE power   d data   a auto   p pause   q quit          </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>The minimum size. The same four ports fit at 60x16; last moves to row 15 and the footer to row 16. Nothing reflows or clips.</p></figcaption>
+      <figcaption class="notes"><p>The minimum size. The same four ports fit at 60x16; the status shares row 15 and the footer is row 16. The poll is shed and the action clips to ten columns.</p></figcaption>
     </figure>
 
     <figure class="term edge-ok">
@@ -446,8 +446,6 @@ kbd{
       </div>
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame O: USB Control with automation on, USB PORT 2 selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                                    </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>   auto 2                    <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">USB PORT 1  </span><span class="ok">ON  </span>      <span class="ok">data on </span>      4.61 V         0.00 A       0.00 W     <span class="bd">│</span>
 <span class="bd">│</span> <span class="lab">A</span> <span class="sel">USB PORT 2  off       -             (202 mV)       0.00 A       0.00 W</span>     <span class="bd">│</span>
@@ -467,7 +465,9 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok, 0x00 off, 0x08 off</span>                             <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok,</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span>   auto 2   <span class="bd">│</span>
 <span class="bd">│</span><span class="bar">SPACE power   d data   a auto   p pause   q quit                              </span><span class="bd">│</span></pre>
       </div>
       <figcaption class="notes"><p><code>A</code> marks an enabled policy; <code>auto 2</code> counts them. USB PORT 2 is selected. Space and d write; a opens this port's policy, p pauses, m opens the menu, q quits.</p></figcaption>
@@ -477,7 +477,7 @@ kbd{
 </section>
 
   <section class="group" aria-labelledby="g-auto">
-    <div class="group-head"><h2 id="g-auto">Automatic control</h2><span>N, O, P</span></div>
+    <div class="group-head"><h2 id="g-auto">Automatic control</h2><span>N, O, P, Q, R</span></div>
     <div class="frames">
 
     <figure class="term edge-ok">
@@ -488,11 +488,9 @@ kbd{
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame N: port policy for USB PORT 2, enabled row selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  AUTO - USB PORT 2                                              </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>   auto 2                    <span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span><span class="sel">   enabled                                                               on</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   cycle       </span>                                                      10 min   <span class="bd">│</span>
-<span class="bd">│</span><span class="lab">   overcurrent </span>                                                       1.5 A   <span class="bd">│</span>
+<span class="bd">│</span><span class="lab">   current     </span>                                                   1.5 A cut   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   retry       </span>                                                        30 s   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   recovery    </span>                                                       5 min   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   schedule    </span>                                                          <span class="ok">on</span>   <span class="bd">│</span>
@@ -508,10 +506,12 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 on - auto cycle</span>                                               <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">LEFT/RIGHT change   p pause   ENTER back   q back                             </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 on - auto cycl</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span>   auto 2   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">ENTER edit   SPACE change   p pause   q back                                  </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>Port policy for USB PORT 2. Each rule is independent and off by default; values are stored even while enabled is off. Left/Right steps and wraps; Enter/q/Esc returns to control, and m does too.</p></figcaption>
+      <figcaption class="notes"><p>Port policy for USB PORT 2. Each rule is independent and off by default; values are stored even while enabled is off. Space or Left/Right steps through the presets and wraps; Enter types a value and Esc cancels; q/Esc returns to control, and m does too.</p></figcaption>
     </figure>
 
     <figure class="term edge-ok">
@@ -522,11 +522,9 @@ kbd{
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame P: port policy for USB PORT 2 at the minimum size, 16 rows by 60 columns."><span class="bd">│</span><span class="bar">HUBCTL  AUTO - USB PORT 2                          </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>   auto 2 <span class="bd">│</span>
-<span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span><span class="sel">  enabled                                             on</span>  <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">  cycle       </span>                                    10 min  <span class="bd">│</span>
-<span class="bd">│</span><span class="lab">  overcurrent </span>                                     1.5 A  <span class="bd">│</span>
+<span class="bd">│</span><span class="lab">  current     </span>                                 1.5 A cut  <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">  retry       </span>                                      30 s  <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">  recovery    </span>                                     5 min  <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">  schedule    </span>                                        <span class="ok">on</span>  <span class="bd">│</span>
@@ -534,17 +532,87 @@ kbd{
 <span class="bd">│</span><span class="lab">  to          </span>                                        18  <span class="bd">│</span>
 <span class="bd">│</span>  <span class="lab">Back        </span>                                            <span class="bd">│</span>
 <span class="bd">│</span>  <span class="dm">rules clear when hubctl exits</span>                           <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">last</span>    <span class="ok">USB2 on - auto cycle</span>                            <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">LEFT/RIGHT change   p pause   ENTER back   q back         </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                          <span class="bd">│</span>
+<span class="bd">│</span>                                                          <span class="bd">│</span>
+<span class="bd">│</span>  <span class="dm">last</span>    <span class="ok">USB2 on - </span>   <span class="dm">port </span>/dev/ttyACM0   <span class="ok">live</span>   auto 2  <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">ENTER edit   SPACE change   p pause   q back              </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>The policy at 60x16. Rows 5..12, Back 13, last 15, footer 16. The poll interval is omitted from the status so <code>auto 2</code> fits; nothing clips.</p></figcaption>
+      <figcaption class="notes"><p>The policy at 60x16. Rows 3..10, Back 11, last 15, footer 16. The poll and the mode are shed from the status so <code>auto 2</code> fits; the action clips to ten columns.</p></figcaption>
+    </figure>
+
+    <figure class="term edge-ok">
+      <div class="term-bar">
+        <span class="term-label"><span class="term-key">Q</span>auto - current</span>
+        <span class="term-size">80x24</span>
+      </div>
+      <div class="screen">
+<pre class="frame" role="img" aria-label="Frame Q: current sub-page for USB PORT 2, over row selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  CURRENT - USB PORT 2                                           </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span><span class="sel">   over                                                               1.5 A</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="lab">   over action </span>                                                         cut   <span class="bd">│</span>
+<span class="bd">│</span><span class="lab">   under       </span>                                                         <span class="dm">off</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="lab">   under action</span>                                                         cut   <span class="bd">│</span>
+<span class="bd">│</span>   <span class="lab">Back        </span>                                                               <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok,</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span>   auto 2   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">ENTER edit   SPACE change   p pause   q back                                  </span><span class="bd">│</span></pre>
+      </div>
+      <figcaption class="notes"><p>The current sub-page, opened with Enter on the <code>current</code> row. Each threshold has its own action: cut leaves the port off for the retry rule, cycle brings it back after the off phase. Enter types a threshold, Space or Left/Right flips the action; q/Esc returns to the policy page.</p></figcaption>
+    </figure>
+
+    <figure class="term edge-ok">
+      <div class="term-bar">
+        <span class="term-label"><span class="term-key">R</span>auto - help</span>
+        <span class="term-size">80x24</span>
+      </div>
+      <div class="screen">
+<pre class="frame" role="img" aria-label="Frame R: auto help, explaining every rule and the current sub-page, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  AUTO HELP                                                      </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">The rules run only while the link is live and normal.</span>                      <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">enabled    the whole policy for this port</span>                                  <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">cycle      power-cycle on its period</span>                                       <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">current    over and under thresholds; Enter opens it</span>                       <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">retry      back on after a cut, three tries</span>                                <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">recovery   cycle when the device leaves the bus</span>                            <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">schedule   on and off at local hours</span>                                       <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">over       trip above this current, two polls</span>                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">under      trip below this current, two polls</span>                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">cut        stay off; retry brings it back</span>                                  <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">cycle      off now, on after the off phase</span>                                 <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok,</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span>   auto 2   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">? close   q back                                                              </span><span class="bd">│</span></pre>
+      </div>
+      <figcaption class="notes"><p>The auto help page, opened with ? on the policy or current page. It names every row and both current actions; q, Esc or ? returns to the policy page.</p></figcaption>
     </figure>
 
     </div>
   </section>
 
 <section class="group" aria-labelledby="g-menu">
-  <div class="group-head"><h2 id="g-menu">Global menu</h2><span>B, I</span></div>
+  <div class="group-head"><h2 id="g-menu">Menu</h2><span>B, I</span></div>
   <div class="frames">
 
     <figure class="term edge-ok">
@@ -553,11 +621,8 @@ kbd{
         <span class="term-size">80x24</span>
       </div>
       <div class="screen">
-<pre class="frame" role="img" aria-label="Frame B: USB Control with the global menu open, Device selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                                    </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
+<pre class="frame" role="img" aria-label="Frame B: USB Control with the menu open, Device selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  MENU                                                           </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>                             <span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">GLOBAL MENU</span>                                                                <span class="bd">│</span>
 <span class="bd">│</span>   <span class="sel">Device </span>                                                                    <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">Settings    </span>                                                               <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">Help        </span>                                                               <span class="bd">│</span>
@@ -575,10 +640,13 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo ok, 0x00 off, 0x08 off</span>                             <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">ENTER open   m close   q close                                                </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">USB2 off - echo</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">SPACE open   m close   q close                                                </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>m opens the global menu in place of the port list. Header, status line, last and footer stay. GLOBAL MENU is a dim heading; Device, Settings and Help are the items and Device is selected. Enter opens the selection; m, Esc or q closes the menu. Future entries add rows.</p></figcaption>
+      <figcaption class="notes"><p>m opens the menu in place of the port list. Header and footer stay; the status moves onto the last line, as on control. Device, Settings and Help are the items and Device is selected. Space or Enter opens the selection; m, Esc or q closes the menu. Future entries add rows.</p></figcaption>
     </figure>
 
     <figure class="term edge-ok">
@@ -587,11 +655,8 @@ kbd{
         <span class="term-size">60x16</span>
       </div>
       <div class="screen">
-<pre class="frame" role="img" aria-label="Frame I: global menu at the minimum size, 16 rows by 60 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB CONTROL                                </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
+<pre class="frame" role="img" aria-label="Frame I: menu at the minimum size, 16 rows by 60 columns."><span class="bd">│</span><span class="bar">HUBCTL  MENU                                       </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span><span class="dm">   poll 1.0 s</span>          <span class="bd">│</span>
-<span class="bd">│</span>                                                          <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">GLOBAL MENU</span>                                             <span class="bd">│</span>
 <span class="bd">│</span>  <span class="sel">Device </span>                                                 <span class="bd">│</span>
 <span class="bd">│</span>  <span class="lab">Settings    </span>                                            <span class="bd">│</span>
 <span class="bd">│</span>  <span class="lab">Help        </span>                                            <span class="bd">│</span>
@@ -601,10 +666,13 @@ kbd{
 <span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">last</span>    <span class="ok">USB2 off - echo ok, 0x00 off, 0x08 off</span>          <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">ENTER open   m close   q close                            </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                          <span class="bd">│</span>
+<span class="bd">│</span>                                                          <span class="bd">│</span>
+<span class="bd">│</span>                                                          <span class="bd">│</span>
+<span class="bd">│</span>  <span class="dm">last</span>    <span class="ok">USB2 off -</span>   <span class="dm">port </span>/dev/ttyACM0   normal   <span class="ok">live</span>  <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">SPACE open   m close   q close                            </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>The global menu at 60x16. GLOBAL MENU is row 5, Device row 6, last row 15 and the footer row 16. The same keys apply; nothing is clipped.</p></figcaption>
+      <figcaption class="notes"><p>The menu at 60x16. Device is row 3, last row 15 and the footer row 16. The same keys apply; nothing is clipped.</p></figcaption>
     </figure>
 
   </div>
@@ -621,8 +689,6 @@ kbd{
       </div>
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame C: Device page, live link, Back selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  DEVICE                                                         </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>                                       <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   ports       </span>                                                           4   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   product     </span>                                                HBP_USB2_4CH   <span class="bd">│</span>
@@ -642,10 +708,12 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                             <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">ENTER back   q back                                                           </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">SPACE back   q back                                                           </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>Device info, reached from the global menu. Enter, q or Esc returns to control. The last line keeps the most recent result, as on every screen. Back is the selected row.</p></figcaption>
+      <figcaption class="notes"><p>Device info, reached from the menu. Enter, q or Esc returns to control. The last line keeps the most recent result, as on every screen. Back is the selected row.</p></figcaption>
     </figure>
   </div>
 </section>
@@ -662,13 +730,11 @@ kbd{
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame J: Help page, live link, Back selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  HELP                                                           </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>                                       <span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">hubctl 0.1.0</span>                                                               <span class="bd">│</span>
 <span class="bd">│</span>   <span class="dm">SmartUSBHub Pro 4CH terminal control</span>                                       <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">j/k     </span><span class="dm">select port</span>                                                        <span class="bd">│</span>
-<span class="bd">│</span>   <span class="lab">SPACE   </span><span class="dm">power on/off</span>                                                       <span class="bd">│</span>
+<span class="bd">│</span>   <span class="lab">SPACE   </span><span class="dm">act on the selected row</span>                                            <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">d       </span><span class="dm">data on/off</span>                                                        <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">m       </span><span class="dm">menu, r refresh</span>                                                    <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">ENTER   </span><span class="dm">open, q quit</span>                                                       <span class="bd">│</span>
@@ -682,8 +748,10 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                             <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">ENTER back   q back                                                           </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">SPACE back   q back                                                           </span><span class="bd">│</span></pre>
       </div>
       <figcaption class="notes"><p>Help, reached from the menu. Enter, q or Esc returns to control. It names the app and version and lists the keys; the last line keeps the most recent result.</p></figcaption>
     </figure>
@@ -703,8 +771,6 @@ kbd{
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame K: Port detail page, USB PORT 2 off, Back selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB PORT 2 - off                                               </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>                                       <span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   power       </span>                                                         <span class="dm">off</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   data        </span>                                                           <span class="dm">-</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   voltage     </span>                                                    <span class="dm">(202 mV)</span>   <span class="bd">│</span>
@@ -723,8 +789,10 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                             <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">ENTER back   q back                                                           </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">SPACE back   q back                                                           </span><span class="bd">│</span></pre>
       </div>
       <figcaption class="notes"><p>Enter on a port opens its detail page. It names the port, shows the live reading with one labelled field per value, and, while data is on, the device this host sees on that port. With data off the usb row says so. Enter, q or Esc returns to control; nothing here writes.</p></figcaption>
     </figure>
@@ -735,8 +803,6 @@ kbd{
       </div>
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame M: Port detail page, USB PORT 2 on, device visible on this host, Back selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  USB PORT 2 - ON - data on                                      </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>                                       <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   power       </span>                                                          <span class="ok">ON</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   data        </span>                                                          <span class="ok">on</span>   <span class="bd">│</span>
@@ -756,8 +822,10 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                             <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">ENTER back   q back                                                           </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">SPACE back   q back                                                           </span><span class="bd">│</span></pre>
       </div>
       <figcaption class="notes"><p>When D+/D- is on and the device enumerates on this host, the detail page adds its VID:PID and product string. With data off, or nothing found, the usb row says why and the product row stays blank.</p></figcaption>
     </figure>
@@ -778,8 +846,6 @@ kbd{
       <div class="screen">
 <pre class="frame" role="img" aria-label="Frame L: Settings page, port row selected, 24 rows by 80 columns."><span class="bd">│</span><span class="bar">HUBCTL  SETTINGS                                                       </span><span class="hs ok"> live </span><span class="bar"> </span><span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>                                       <span class="bd">│</span>
-<span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span><span class="sel">   port                                                        /dev/ttyACM0</span>   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   poll        </span>                                                       1.0 s   <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
@@ -798,8 +864,10 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on /dev/ttyACM0</span>                             <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">LEFT/RIGHT change   ENTER back   q back                                       </span><span class="bd">│</span></pre>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>                                                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>   <span class="bd">│</span>
+<span class="bd">│</span><span class="bar">SPACE change   ENTER back   q back                                            </span><span class="bd">│</span></pre>
       </div>
       <figcaption class="notes"><p>Settings, reached from the menu. j and k choose port or poll; left and right step the value. Changing the port closes the link and reopens at the new endpoint; changing poll takes effect on the next cycle. Enter, q, Esc and m return to control.</p></figcaption>
     </figure>
@@ -850,15 +918,16 @@ kbd{
   <div class="table-wrap">
     <table class="ref">
       <thead>
-        <tr><th scope="col">Key</th><th scope="col">Control</th><th scope="col">Port detail</th><th scope="col">Port policy</th><th scope="col">Global menu</th><th scope="col">Settings</th><th scope="col">Device</th><th scope="col">Help</th></tr>
+        <tr><th scope="col">Key</th><th scope="col">Control</th><th scope="col">Port detail</th><th scope="col">Port policy</th><th scope="col">Menu</th><th scope="col">Settings</th><th scope="col">Device</th><th scope="col">Help</th></tr>
       </thead>
       <tbody>
         <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>select port</td><td>-</td><td>select row</td><td>select item</td><td>select setting</td><td>-</td><td>-</td></tr>
         <tr><td><kbd>Left</kbd> / <kbd>Right</kbd></td><td>-</td><td>-</td><td>change value</td><td>-</td><td>change value</td><td>-</td><td>-</td></tr>
+        <tr><td><kbd>?</kbd></td><td>-</td><td>-</td><td>auto help</td><td>-</td><td>auto help</td><td>-</td><td>-</td></tr>
         <tr><td><kbd>Enter</kbd></td><td>open port detail</td><td>back</td><td>back</td><td>open item</td><td>back</td><td>back</td><td>back</td></tr>
         <tr><td><kbd>a</kbd></td><td>open this port's policy</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
         <tr><td><kbd>p</kbd></td><td>pause automation</td><td>-</td><td>pause automation</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-        <tr><td><kbd>Space</kbd></td><td>toggle power</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>toggle power</td><td>change value</td><td>back</td><td>open item</td><td>change value</td><td>back</td><td>back</td></tr>
         <tr><td><kbd>d</kbd></td><td>toggle data</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
         <tr><td><kbd>m</kbd></td><td>open menu</td><td>back to control</td><td>back to control</td><td>close</td><td>back to control</td><td>back to control</td><td>back to control</td></tr>
         <tr><td><kbd>r</kbd></td><td>refresh</td><td>refresh</td><td>refresh</td><td>refresh</td><td>refresh</td><td>refresh</td><td>refresh</td></tr>

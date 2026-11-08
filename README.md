@@ -12,12 +12,13 @@ Python standard library only. Linux and macOS. The vendor SDK under
 - Shows identity, mode, and per-port power, D+/D-, voltage, current and watts
   on one control page, one row per port.
 - Switches VBUS and D+/D- on the selected port, then reads both states back.
-- Opens a global menu with `m`; it holds `Device`, `Settings` and `Help`.
+- Opens a menu with `m`; it holds `Device`, `Settings` and `Help`.
 - On a port detail page, shows the downstream USB device (VID:PID and product)
   when D+/D- is on and the device is visible on this host.
-- Automatic control per port: power-cycle on a timer, overcurrent cut with a
-  capped retry, recovery when the device leaves the bus, and a daily schedule.
-  Off by default; `a` opens the selected port's policy, `p` pauses all rules.
+- Automatic control per port: power-cycle on a timer, over and under-current
+  trips with a capped retry, recovery when the device leaves the bus, and a
+  daily schedule. Off by default; `a` opens the selected port's policy, `?`
+  explains it, `p` pauses all rules.
 - Shows LIVE / STALE / LOST; switching is disabled when the link is stale or the
   unit is in interlock mode.
 - Blocks NVM writes, reset, reboot, factory reset, interlock control and V3
@@ -46,7 +47,7 @@ hubctl
 
 ## Keys
 
-| Key | Control | Port detail | Port policy | Global menu | Settings | Device | Help |
+| Key | Control | Port detail | Port policy | Menu | Settings | Device | Help |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `j` / `Down` | next port | - | next row | next item | next setting | - | - |
 | `k` / `Up` | previous port | - | previous row | previous item | previous setting | - | - |

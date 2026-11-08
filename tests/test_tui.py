@@ -212,10 +212,10 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(controller.power, [])
         self.assertEqual(controller.data, [])
 
-    def test_space_and_d_do_nothing_on_menu_and_device(self):
+    def test_space_opens_on_the_menu_and_backs_out_elsewhere(self):
         code, controller, _terminal = run_loop(
-            [("m", 0.0), ("space", 0.1), ("d", 0.2), ("enter", GAP),
-             ("space", 1.0), ("d", 1.1), ("q", 1.5), ("q", 2.0)])
+            [("m", 0.0), ("space", 0.1), ("d", 0.2), ("space", GAP),
+             ("q", 1.5), ("q", 2.0)])
         self.assertEqual(code, 0)
         self.assertEqual(controller.power, [])
         self.assertEqual(controller.data, [])
@@ -225,8 +225,8 @@ class MenuTests(unittest.TestCase):
             [("m", 0.0), ("enter", GAP), ("q", 1.0), ("q", 1.5)],
             snapshot=make_no_device())
         self.assertEqual(code, 0)
-        self.assertTrue(any("GLOBAL MENU" in frame[4]
-                            for frame in terminal.frames))
+        self.assertTrue(any("HUBCTL  MENU" in line
+                            for line in headers(terminal)))
         self.assertTrue(any("HUBCTL  DEVICE" in line
                             for line in headers(terminal)))
         self.assertIn(FOOTER_NO_DEVICE, footers(terminal)[-1])
@@ -269,6 +269,18 @@ class AutoTests(unittest.TestCase):
         self.assertEqual(controller.power, [])
         self.assertEqual(controller.data, [])
 
+    def test_enter_types_a_value_on_the_current_sub_page(self):
+        code, controller, _terminal = run_loop(
+            [("a", 0.0), ("j", GAP), ("j", 1.0), ("enter", 1.5),
+             ("enter", 2.0), ("1", 2.1), (".", 2.2), ("8", 2.3),
+             ("enter", 2.9), ("q", 3.1), ("q", 3.3), ("q", 3.5)])
+        self.assertEqual(code, 0)
+        port, rule = controller.policies[-1]
+        self.assertEqual(port, 1)
+        self.assertEqual(rule.overcurrent_ma, 1800)
+        self.assertEqual(controller.power, [])
+        self.assertEqual(controller.data, [])
+
     def test_the_auto_pages_never_reach_the_power_or_data_path(self):
         code, controller, _terminal = run_loop(
             [("a", 0.0), ("space", GAP), ("d", 1.0), ("q", 1.5),
@@ -276,7 +288,8 @@ class AutoTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(controller.power, [])
         self.assertEqual(controller.data, [])
-        self.assertEqual(controller.policies, [])
+        self.assertTrue(controller.policies)
+        self.assertTrue(controller.policies[-1][1].enabled)
 
 
 class RefreshTests(unittest.TestCase):

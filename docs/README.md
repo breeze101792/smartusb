@@ -48,7 +48,7 @@ Control app implemented. `src/hubctl` runs one USB Control page against the CMD
 port: identity, mode, per-port power/data/voltage/current, a read-only detail
 page per port with the downstream USB identity when data is on, a Settings
 page for the endpoint and poll period, and guarded
-VBUS/D+/D- switching on the selected port. `m` opens a global menu with
+VBUS/D+/D- switching on the selected port. `m` opens a menu with
 `Device`, `Auto`, `Settings` and `Help`. Automatic control is per port and
 session-only. The host suite, the pty app test, the
 refactored lab-tool self-test, and a read-only on-target run pass. Real VBUS
@@ -62,7 +62,7 @@ switching by the app is not yet run.
    still unknown, and the checks that close each unknown.
 3. [ARCH-001](./architecture/overview.md) — the control app layers, module
    boundaries and hardware contract.
-4. [UI-MENU-002](./ui/menu.md) — the page, the global menu and its states.
+4. [UI-MENU-002](./ui/menu.md) — the page, the menu and its states.
 5. [IF-PROTO-001](./contracts/protocols.md) — frames, commands and timing.
 6. [T-PLAN-001](./testing/TEST_PLAN.md) — what is proven, and what is not.
 7. Do not design control behaviour against an `UNK` line without either

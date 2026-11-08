@@ -18,21 +18,37 @@ from ..constants import (
     AUTO_NORMAL_SAMPLES,
     AUTO_OVER_SAMPLES,
     AUTO_SCHEDULE_DEFAULT,
+    AUTO_UNDER_SAMPLES,
     AUTO_WALL_JUMP_S,
 )
 from ..hal.base import ChannelReading, LinkState, Mode, Snapshot
 
 # Policy fields in display order, docs/ui/menu.md section 3.6.
-POLICY_FIELDS = ("enabled", "cycle", "overcurrent", "retry", "recovery",
+POLICY_FIELDS = ("enabled", "cycle", "current", "retry", "recovery",
                  "schedule", "from", "to")
+CURRENT_FIELDS = ("over", "over_action", "under", "under_action")
+
+# What a current trigger does when it fires.
+ACTION_CUT = "cut"
+ACTION_CYCLE = "cycle"
+ACTIONS = (ACTION_CUT, ACTION_CYCLE)
 
 # Allowed values, docs/ui/menu.md section 3.6. None is off.
 CYCLE_CHOICES = (None, AUTO_MIN_CYCLE_S, 300, 600, 1800, 3600)
 OVERCURRENT_CHOICES = (None, 500, 1000, 1500, 2000)
+UNDERCURRENT_CHOICES = (None, 50, 100, 250, 500)
 RETRY_CHOICES = (None, 10, 30, 60)
 RECOVERY_CHOICES = (None, 60, 300, 600)
 
 HOURS = 24
+
+# Typed-value limits, docs/ui/menu.md section 3.5. None of these are
+# persisted; they only bound what the editor accepts.
+CYCLE_LIMITS = (1, 60)
+OVERCURRENT_LIMITS = (0.1, 4.0)   # the channel measures 0..4.0 A
+UNDERCURRENT_LIMITS = (0.01, 4.0)
+RETRY_LIMITS = (1, 60)
+RECOVERY_LIMITS = (1, 60)
 
 
 @dataclass(frozen=True)
@@ -42,6 +58,9 @@ class Policy:
     enabled: bool = False
     cycle_s: int | None = None
     overcurrent_ma: int | None = None
+    over_action: str = ACTION_CUT
+    under_ma: int | None = None
+    under_action: str = ACTION_CUT
     retry_s: int | None = None
     recovery_s: int | None = None
     schedule: tuple[int, int] | None = None
@@ -54,6 +73,7 @@ class PortAuto:
     last_cycle_at: float | None = None
     cut_at: float | None = None
     over_at: int = 0
+    under_at: int = 0
     normal_at: int = 0
     retries: int = 0
     low_since: float | None = None
@@ -141,10 +161,17 @@ def step(rule: Policy, field: str, delta: int) -> Policy:
     if field == "cycle":
         return replace(rule, cycle_s=_choose(CYCLE_CHOICES, rule.cycle_s,
                                              delta))
-    if field == "overcurrent":
+    if field == "over":
         return replace(rule, overcurrent_ma=_choose(OVERCURRENT_CHOICES,
                                                      rule.overcurrent_ma,
                                                      delta))
+    if field == "over_action":
+        return replace(rule, over_action=_other_action(rule.over_action))
+    if field == "under":
+        return replace(rule, under_ma=_choose(UNDERCURRENT_CHOICES,
+                                              rule.under_ma, delta))
+    if field == "under_action":
+        return replace(rule, under_action=_other_action(rule.under_action))
     if field == "retry":
         return replace(rule, retry_s=_choose(RETRY_CHOICES, rule.retry_s,
                                              delta))
@@ -162,6 +189,42 @@ def step(rule: Policy, field: str, delta: int) -> Policy:
             end = ((end // 60 + delta) % HOURS) * 60
         return replace(rule, schedule=(start, end))
     return rule
+
+
+def set_value(rule: Policy, field: str, text: str):
+    """Apply a typed value. Returns None when the text is not a number."""
+    try:
+        value = float(text)
+    except (TypeError, ValueError):
+        return None
+    if field == "cycle":
+        return replace(rule, cycle_s=int(_clamped(value, CYCLE_LIMITS)) * 60)
+    if field == "over":
+        return replace(rule, overcurrent_ma=round(
+            _clamped(value, OVERCURRENT_LIMITS) * 1000))
+    if field == "under":
+        return replace(rule, under_ma=round(
+            _clamped(value, UNDERCURRENT_LIMITS) * 1000))
+    if field == "retry":
+        return replace(rule, retry_s=int(_clamped(value, RETRY_LIMITS)))
+    if field == "recovery":
+        return replace(rule, recovery_s=int(_clamped(value, RECOVERY_LIMITS)) * 60)
+    if field in ("from", "to") and rule.schedule is not None:
+        hour = int(_clamped(value, (0, HOURS - 1)))
+        start, end = rule.schedule
+        if field == "from":
+            return replace(rule, schedule=(hour * 60, end))
+        return replace(rule, schedule=(start, hour * 60))
+    return None
+
+
+def _other_action(action: str) -> str:
+    return ACTION_CYCLE if action == ACTION_CUT else ACTION_CUT
+
+
+def _clamped(value, limits):
+    low, high = limits
+    return max(low, min(value, high))
 
 
 def _choose(choices, current, delta: int):
@@ -196,6 +259,10 @@ def _evaluate_port(port: int, rule: Policy, reading: ChannelReading,
         # cancels the deferred work instead of postponing it.
         _cancel_port_state(state)
         return None
+
+    under = _undercurrent(port, rule, reading, state, power, mono)
+    if under is not None:
+        return under
 
     retry = _retry(port, rule, state, power, mono)
     if retry is not None:
@@ -234,8 +301,7 @@ def _overcurrent(port: int, rule: Policy, reading: ChannelReading,
         if state.over_at < AUTO_OVER_SAMPLES:
             return None
         state.over_at = 0
-        state.cut_at = mono
-        _cancel_port_state(state)
+        _trigger(port, rule.over_action, state, mono, "overcurrent")
         return Decision(port, False,
                         f"USB{port} off - auto overcurrent "
                         f"{current / 1000:.2f} A")
@@ -243,6 +309,43 @@ def _overcurrent(port: int, rule: Policy, reading: ChannelReading,
     state.normal_at += 1
     if state.normal_at >= AUTO_NORMAL_SAMPLES:
         state.retries = 0
+    return None
+
+
+def _trigger(port: int, action: str, state: PortAuto, mono: float,
+             label: str):
+    """Apply a current trigger's action: cut for retry, or cycle back on."""
+    _cancel_port_state(state)
+    if action == ACTION_CYCLE:
+        state.last_cycle_at = mono
+        state.pending_on_at = mono + AUTO_CYCLE_OFF_S
+        state.pending_text = f"USB{port} on - auto {label}"
+    else:
+        state.cut_at = mono
+
+
+def _undercurrent(port: int, rule: Policy, reading: ChannelReading,
+                   state: PortAuto, power: bool | None,
+                   mono: float) -> Decision | None:
+    """Rule 1b. Two below-threshold samples cut, like the overcurrent cut."""
+    if rule.under_ma is None:
+        return None
+    if power is not True:
+        state.under_at = 0
+        return None
+    current = reading.current_ma
+    if current is None:
+        return None
+    if current < rule.under_ma:
+        state.under_at += 1
+        if state.under_at < AUTO_UNDER_SAMPLES:
+            return None
+        state.under_at = 0
+        _trigger(port, rule.under_action, state, mono, "undercurrent")
+        return Decision(port, False,
+                        f"USB{port} off - auto undercurrent "
+                        f"{current / 1000:.2f} A")
+    state.under_at = 0
     return None
 
 

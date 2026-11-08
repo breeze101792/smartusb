@@ -203,6 +203,16 @@ class KeyTests(unittest.TestCase):
         self.assertEqual(action.kind, menu.SET_POLL)
         self.assertEqual(action.value, 2.0)
 
+    def test_space_changes_the_selected_policy_value(self):
+        state = menu.State(menu.POLICY, port=2)
+        _, action = menu.handle_key(self.snapshot, state, "space")
+        self.assertEqual(action.kind, menu.SET_POLICY)
+        self.assertEqual(action.port, 2)
+        self.assertEqual(action.value, ("enabled", 1))
+        moved, _ = menu.handle_key(self.snapshot, state, "j")
+        _, action = menu.handle_key(self.snapshot, moved, "space")
+        self.assertEqual(action.value, ("cycle", 1))
+
     def test_enter_on_settings_returns_to_control(self):
         state = menu.State(menu.MENU, menu_index=1)
         settings, action = menu.handle_key(self.snapshot, state, "enter")
@@ -239,12 +249,19 @@ class KeyTests(unittest.TestCase):
         self.assertEqual((action.kind, action.port),
                          (menu.TOGGLE_DATA, 3))
 
-    def test_space_and_d_do_nothing_on_menu_and_device(self):
+    def test_space_acts_on_the_selected_row_and_d_does_nothing(self):
+        moved, action = menu.handle_key(
+            self.snapshot, menu.State(menu.MENU), "space")
+        self.assertIsNone(action)
+        self.assertEqual(moved.screen, menu.DEVICE)
+        moved, action = menu.handle_key(
+            self.snapshot, menu.State(menu.DEVICE), "space")
+        self.assertIsNone(action)
+        self.assertEqual(moved.screen, menu.CONTROL)
         for state in (menu.State(menu.MENU), menu.State(menu.DEVICE)):
-            for key in ("space", "d"):
-                moved, action = menu.handle_key(self.snapshot, state, key)
-                self.assertIsNone(action)
-                self.assertEqual(moved, state)
+            moved, action = menu.handle_key(self.snapshot, state, "d")
+            self.assertIsNone(action)
+            self.assertEqual(moved, state)
 
     def test_no_device_has_no_write_and_still_opens_the_menu(self):
         snapshot = make_no_device()
@@ -329,19 +346,93 @@ class AutoTests(unittest.TestCase):
         wrapped, _ = menu.handle_key(self.snapshot, last, "j")
         self.assertEqual(menu.index(self.snapshot, wrapped), 0)
 
-    def test_enter_q_escape_and_m_return_to_control(self):
-        for key in ("enter", "q", "escape", "m"):
-            state = menu.State(menu.POLICY, port=2)
+    def test_enter_opens_the_current_page_or_the_editor(self):
+        current, action = menu.handle_key(
+            self.snapshot, menu.State(menu.POLICY, port=2, policy_index=2),
+            "enter")
+        self.assertIsNone(action)
+        self.assertEqual(current.screen, menu.CURRENT)
+        state = menu.State(menu.POLICY, port=2, policy_index=1)
+        editing, action = menu.handle_key(self.snapshot, state, "enter")
+        self.assertIsNone(action)
+        self.assertEqual(editing.edit, "")
+        for key in ("q", "escape", "m"):
             back, action = menu.handle_key(self.snapshot, state, key)
             self.assertIsNone(action)
             self.assertEqual(back.screen, menu.CONTROL, key)
+        toggled, action = menu.handle_key(
+            self.snapshot, menu.State(menu.POLICY, port=2), "enter")
+        self.assertIsNone(toggled.edit)
+        self.assertEqual(action.kind, menu.SET_POLICY)
 
-    def test_space_and_d_do_nothing_on_the_policy_page(self):
-        for key in ("space", "d"):
-            moved, action = menu.handle_key(
-                self.snapshot, menu.State(menu.POLICY, port=2), key)
+    def test_the_editor_types_commits_and_cancels(self):
+        state = menu.State(menu.CURRENT, port=2, current_index=0)
+        state, _ = menu.handle_key(self.snapshot, state, "enter")
+        for key in ("1", ".", "8"):
+            state, action = menu.handle_key(self.snapshot, state, key)
             self.assertIsNone(action)
-            self.assertEqual(moved.screen, menu.POLICY)
+        self.assertEqual(state.edit, "1.8")
+        done, action = menu.handle_key(self.snapshot, state, "enter")
+        self.assertIsNone(done.edit)
+        self.assertEqual(action.kind, menu.SET_POLICY_VALUE)
+        self.assertEqual(action.value, ("over", "1.8"))
+        cancelled, action = menu.handle_key(
+            self.snapshot,
+            menu.State(menu.CURRENT, port=2, current_index=0, edit="2"),
+            "escape")
+        self.assertIsNone(action)
+        self.assertIsNone(cancelled.edit)
+        edited, _ = menu.handle_key(
+            self.snapshot,
+            menu.State(menu.CURRENT, port=2, current_index=0, edit="12"),
+            "backspace")
+        self.assertEqual(edited.edit, "1")
+
+    def test_the_editor_refuses_out_of_range_input(self):
+        cycle = menu.State(menu.POLICY, port=2, policy_index=1)
+        cycle, _ = menu.handle_key(self.snapshot, cycle, "enter")
+        cycle, _ = menu.handle_key(self.snapshot, cycle, "6")
+        cycle, _ = menu.handle_key(self.snapshot, cycle, "5")
+        self.assertEqual(cycle.edit, "6")
+        amps = menu.State(menu.CURRENT, port=2, current_index=0, edit="4")
+        kept, _ = menu.handle_key(self.snapshot, amps, "5")
+        self.assertEqual(kept.edit, "4")
+        low = menu.State(menu.POLICY, port=2, policy_index=3, edit="0")
+        moved, action = menu.handle_key(self.snapshot, low, "enter")
+        self.assertEqual(moved.edit, "0")
+        self.assertIsNone(action)
+        empty = menu.State(menu.CURRENT, port=2, current_index=0, edit="")
+        done, action = menu.handle_key(self.snapshot, empty, "enter")
+        self.assertIsNone(done.edit)
+        self.assertIsNone(action)
+
+    def test_the_editor_keeps_digits_only_and_one_dot(self):
+        cycle = menu.State(menu.POLICY, port=2, policy_index=1, edit="4")
+        kept, _ = menu.handle_key(self.snapshot, cycle, ".")
+        self.assertEqual(kept.edit, "4")
+        amps = menu.State(menu.CURRENT, port=2, current_index=0, edit="1.5")
+        doubled, _ = menu.handle_key(self.snapshot, amps, ".")
+        self.assertEqual(doubled.edit, "1.5")
+
+    def test_question_opens_the_auto_help_and_q_returns(self):
+        for screen, state in ((menu.POLICY, menu.State(menu.POLICY, port=2)),
+                              (menu.CURRENT, menu.State(menu.CURRENT, port=2))):
+            help_state, action = menu.handle_key(self.snapshot, state, "?")
+            self.assertIsNone(action)
+            self.assertEqual(help_state.screen, menu.AUTOHELP)
+            back, action = menu.handle_key(self.snapshot, help_state, "q")
+            self.assertIsNone(action)
+            self.assertEqual(back.screen, menu.POLICY, screen)
+
+    def test_space_changes_and_d_does_nothing_on_the_policy_page(self):
+        moved, action = menu.handle_key(
+            self.snapshot, menu.State(menu.POLICY, port=2), "space")
+        self.assertEqual(action.kind, menu.SET_POLICY)
+        self.assertEqual(moved.screen, menu.POLICY)
+        moved, action = menu.handle_key(
+            self.snapshot, menu.State(menu.POLICY, port=2), "d")
+        self.assertIsNone(action)
+        self.assertEqual(moved.screen, menu.POLICY)
 
 
 if __name__ == "__main__":
