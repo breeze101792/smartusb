@@ -135,7 +135,7 @@ port. Ports are considered in ascending order, so a tie is deterministic.
 | Exit | no write; a port mid-cycle stays off |
 
 The last row is deliberate. A 2 s off phase can be left behind by `q`; the
-user is told on the policy page that rules clear on exit.
+user is told on the policy page that the rules are saved for the next run.
 
 ## 6. Timing
 
@@ -177,7 +177,7 @@ has passed.
 | Status placement | every page draws the status on the `last` row, right-aligned, and never moves it; the status sheds the poll then the mode to keep ten columns for the action, and stays on row 3 only when there is no device |
 | Narrow widths | drop `poll <n> s` first, never the auto field |
 | Port rows | `A` at column 3 for an enabled port |
-| Policy page | dim row 14: `rules clear when hubctl exits` |
+| Policy page | dim row 12: `rules are saved for the next run` |
 
 ## 9. Invariants
 
@@ -186,7 +186,7 @@ has passed.
 | INV-012 | An automated write happens only while the link is LIVE and the mode is normal |
 | INV-013 | A manual VBUS change suppresses automation for 5 s on that port; a safe cut is exempt |
 | INV-014 | At most one automated write per poll, through `set_power` with readback |
-| INV-015 | No policy is persisted, and exiting performs no write |
+| INV-015 | The poll period and the rules are saved under `$XDG_STATE_HOME`; the runtime state is not, and exiting performs no write |
 | INV-016 | The cut uses `0x04`; the vendor overcurrent candidates `0x1B`/`0x1C` stay out of the allow-list (`UNK-006`) |
 
 ## 10. Risks

@@ -22,15 +22,16 @@ The last command reads the unit and switches nothing.
 | --- | --- | --- | --- |
 | T-APP-001 | V1/V2/V3 framing, CRC, resync, truncation, masks | `tests/test_protocol.py` | 8 pass |
 | T-APP-002 | Driver identity, status, reads, writes, interlock rejection, bad echo, silence, allow-list, unsolicited report | `tests/test_driver.py` (pty fake) | 10 pass |
-| T-APP-003 | Controller poll cycle, staleness, deadline, write readback, mismatch, rejection, data guard, backoff, identity gate, no replay, result strings, link loss during readback, port and poll settings, `set_power`, automatic writes | `tests/test_controller.py` (fake driver, fake clock) | 41 pass |
+| T-APP-003 | Controller poll cycle, staleness, deadline, write readback, mismatch, rejection, data guard, backoff, identity gate, no replay, result strings, link loss during readback, port and poll settings, `set_power`, automatic writes, state save and restore | `tests/test_controller.py` (fake driver, fake clock) | 44 pass |
 | T-APP-004 | Frame: rails, bars, badge, port grid, reverse-video selection, residual voltage, data dash, every link state, interlock, no device, 60x16, ASCII rails, width/height sweep, clipping, shared status on the last row of every page, LOST dim, menu, port detail, Device, Help, Settings, all sixteen mockup frames, downstream usb rows, policy page, policy editor, current sub-page, auto help | `tests/test_view.py` | 55 pass |
 | T-APP-005 | Discovery keeps `fe0c`, rejects `8091` | `tests/test_discovery.py` (fake sysfs tree) | 2 pass |
 | T-APP-006 | Real app process: start, draw, toggle a port with Space, open the menu, quit, alternate-screen restore; no-device state | `tests/test_app_pty.py` (pty + FakeHub) | 2 pass |
-| T-APP-007 | Control page, port detail, menu, Settings and the per-port policy page: selection, navigation, value stepping, the guarded typed-value editor, current sub-page, auto help, pause | `tests/test_menu.py` | 44 pass |
-| T-APP-008 | TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, Left/Right change settings, usb map read only with data on, `a`/`p`, policy stepping and typing, every screen redrawn twice, per-key repeat guard | `tests/test_tui.py` (fake controller, terminal and clock) | 26 pass |
+| T-APP-007 | Control page, port detail, menu, Settings and the per-port policy page: selection, navigation, value stepping, the guarded typed-value editor, current sub-page, auto help, pause | `tests/test_menu.py` | 46 pass |
+| T-APP-008 | TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, Left/Right change settings, usb map read only with data on, `a`/`p`, policy stepping and typing, every screen redrawn twice, per-key repeat guard | `tests/test_tui.py` (fake controller, terminal and clock) | 27 pass |
 | T-APP-009 | Key decode: arrows, lone Esc, unknown escape sequences ignored, plain keys | `tests/test_term.py` (pipe fd) | 4 pass |
 | T-APP-010 | Downstream USB map: DATA hub discovery, port child lookup, empty port, missing tree | `tests/test_usbmap.py` (fake sysfs tree) | 4 pass |
 | T-APP-011 | Automatic control: every rule, priority, gates, timer cancellation, retry cap, schedule edges, clock jump, typed values, under-current cut, per-trigger actions | `tests/test_policy.py` (fake clocks) | 61 pass |
+| T-APP-012 | State file: round trip, missing, corrupt and foreign versions, unknown fields, bad values, default XDG path | `tests/test_store.py` | 7 pass |
 
 The pty fake can stay silent, reject `0x01`, echo the wrong value, inject an
 unsolicited `0x00`, and disconnect.

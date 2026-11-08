@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from ..constants import MAX_CHANNELS, POLL_CHOICES_S
+from ..constants import MAX_CHANNELS, POLL_CHOICES_S, POLL_LIMITS_S
 from ..hal.base import ChannelReading, LinkState, Snapshot
 from . import policy
 
@@ -48,14 +48,15 @@ LABEL_HELP = "Help"
 LABEL_BACK = "Back"
 PORT_LABEL = "USB PORT"
 AUTO_MARKER = "A"
-AUTO_NOTE = "rules clear when hubctl exits"
+AUTO_NOTE = "rules are saved for the next run"
 AUTO_TITLE = "HUBCTL  AUTO"
 POLICY_ROWS = policy.POLICY_FIELDS
 CURRENT_ROWS = policy.CURRENT_FIELDS
 
 # Fields with a typed value, and the unit the editor shows beside it.
 EDIT_UNITS = {"cycle": "min", "over": "A", "under": "A", "retry": "s",
-              "recovery": "min"}
+              "recovery": "min", "poll": "s"}
+EDIT_DECIMALS = ("over", "under", "poll")
 EDIT_LIMITS = {
     "cycle": policy.CYCLE_LIMITS,
     "over": policy.OVERCURRENT_LIMITS,
@@ -64,6 +65,7 @@ EDIT_LIMITS = {
     "recovery": policy.RECOVERY_LIMITS,
     "from": (0, policy.HOURS - 1),
     "to": (0, policy.HOURS - 1),
+    "poll": POLL_LIMITS_S,
 }
 EDIT_CHARS = "0123456789."
 EDIT_MAX_LEN = 4
@@ -188,6 +190,8 @@ def handle_key(snapshot: Snapshot, state: State,
             return _policy_enter(state)
         if state.screen == CURRENT:
             return _current_enter(state)
+        if state.screen == SETTINGS:
+            return _settings_enter(snapshot, state)
         return _enter(snapshot, state)
     if key == "m":
         return _menu(state)
@@ -317,7 +321,7 @@ def _menu(state: State) -> tuple[State, Action | None]:
 
 def _enter(snapshot: Snapshot,
            state: State) -> tuple[State, Action | None]:
-    """Enter runs the selected menu item and backs out of the detail pages.
+    """Enter runs the selected menu item and backs out of every other page.
 
     Enter never writes and does nothing on the control page.
     """
@@ -327,8 +331,10 @@ def _enter(snapshot: Snapshot,
             return state, None
         return replace(state, screen=PORT,
                        port=index(snapshot, state) + 1), None
-    if state.screen == POLICY:
-        return replace(state, screen=CONTROL, port=0), None
+    if state.screen != MENU:
+        # Settings, Device, Help and port detail select a setting, not the
+        # Back item, so Enter always leaves the page.
+        return _back(state)
     item = items(state)[index(snapshot, state)]
     if item.action == OPEN_DEVICE:
         return replace(state, screen=DEVICE), None
@@ -336,9 +342,7 @@ def _enter(snapshot: Snapshot,
         return replace(state, screen=SETTINGS, settings_index=0), None
     if item.action == OPEN_HELP:
         return replace(state, screen=HELP), None
-    if item.action == BACK:
-        return replace(state, screen=CONTROL, port=0), None
-    return state, None
+    return _back(state)
 
 
 def _write(snapshot: Snapshot, state: State,
@@ -375,12 +379,18 @@ def _move(snapshot: Snapshot, state: State, delta: int) -> State:
 
 
 def _rows(state: State) -> tuple[str, ...]:
-    return CURRENT_ROWS if state.screen == CURRENT else POLICY_ROWS
+    if state.screen == CURRENT:
+        return CURRENT_ROWS
+    if state.screen == SETTINGS:
+        return SETTINGS_ROWS
+    return POLICY_ROWS
 
 
 def _position(state: State) -> int:
     if state.screen == CURRENT:
         return min(state.current_index, len(CURRENT_ROWS))
+    if state.screen == SETTINGS:
+        return min(state.settings_index, len(SETTINGS_ROWS) - 1)
     return min(state.policy_index, len(POLICY_ROWS))
 
 
@@ -392,6 +402,14 @@ def _policy_enter(state: State) -> tuple[State, Action | None]:
     if POLICY_ROWS[position] == "current":
         return replace(state, screen=CURRENT, current_index=0), None
     return _edit_start(state)
+
+
+def _settings_enter(snapshot: Snapshot,
+                    state: State) -> tuple[State, Action | None]:
+    """Enter edits the poll interval and steps the port choice."""
+    if SETTINGS_ROWS[_position(state)] == "poll":
+        return _edit_start(state)
+    return _change(snapshot, state, 1)
 
 
 def _current_enter(state: State) -> tuple[State, Action | None]:
@@ -423,6 +441,9 @@ def _edit_key(state: State, key: str) -> tuple[State, Action | None]:
             return replace(state, edit=None), None
         if not edit_valid(field, state.edit):
             return state, None
+        if state.screen == SETTINGS:
+            return (replace(state, edit=None),
+                    Action(SET_POLL, value=round(float(state.edit), 1)))
         return (replace(state, edit=None),
                 Action(SET_POLICY_VALUE, port=state.port,
                        value=(field, state.edit)))
@@ -433,7 +454,7 @@ def _edit_key(state: State, key: str) -> tuple[State, Action | None]:
     if len(key) == 1 and key in EDIT_CHARS:
         if len(state.edit) >= EDIT_MAX_LEN:
             return state, None
-        if key == "." and (EDIT_UNITS.get(field) != "A" or "." in state.edit):
+        if key == "." and (field not in EDIT_DECIMALS or "." in state.edit):
             return state, None
         if not _edit_accepts(field, state.edit, key):
             return state, None

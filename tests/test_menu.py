@@ -213,15 +213,40 @@ class KeyTests(unittest.TestCase):
         _, action = menu.handle_key(self.snapshot, moved, "space")
         self.assertEqual(action.value, ("cycle", 1))
 
-    def test_enter_on_settings_returns_to_control(self):
+    def test_enter_leaves_the_read_only_pages_from_any_row(self):
+        cases = (menu.State(menu.DEVICE), menu.State(menu.HELP),
+                 menu.State(menu.PORT, port=2))
+        for state in cases:
+            back, action = menu.handle_key(self.snapshot, state, "enter")
+            self.assertIsNone(action)
+            self.assertEqual(back.screen, menu.CONTROL, state.screen)
+
+    def test_enter_on_settings_edits_poll_or_steps_port(self):
         state = menu.State(menu.MENU, menu_index=1)
         settings, action = menu.handle_key(self.snapshot, state, "enter")
         self.assertIsNone(action)
         self.assertEqual(settings.screen, menu.SETTINGS)
-        for key in ("enter", "q", "escape", "m"):
+        stepped, action = menu.handle_key(self.snapshot, settings, "enter")
+        self.assertEqual(action.kind, menu.SET_PORT)
+        poll = menu.State(menu.SETTINGS, settings_index=1)
+        editing, action = menu.handle_key(self.snapshot, poll, "enter")
+        self.assertIsNone(action)
+        self.assertEqual(editing.edit, "")
+        self.assertEqual(editing.screen, menu.SETTINGS)
+        for key in ("q", "escape", "m"):
             back, action = menu.handle_key(self.snapshot, settings, key)
             self.assertIsNone(action)
-            self.assertEqual(back.screen, menu.CONTROL)
+            self.assertEqual(back.screen, menu.CONTROL, key)
+
+    def test_the_poll_editor_commits_seconds(self):
+        state = menu.State(menu.SETTINGS, settings_index=1)
+        state, _ = menu.handle_key(self.snapshot, state, "enter")
+        for key in ("1", ".", "5"):
+            state, _ = menu.handle_key(self.snapshot, state, key)
+        done, action = menu.handle_key(self.snapshot, state, "enter")
+        self.assertIsNone(done.edit)
+        self.assertEqual(action.kind, menu.SET_POLL)
+        self.assertEqual(action.value, 1.5)
 
     def test_q_and_escape_return_from_device(self):
         for key in ("q", "escape"):

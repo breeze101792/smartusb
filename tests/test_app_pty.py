@@ -5,6 +5,7 @@ import select
 import struct
 import subprocess
 import sys
+import tempfile
 import termios
 import time
 import unittest
@@ -16,6 +17,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AppPtyTests(unittest.TestCase):
+    def setUp(self):
+        self.state = tempfile.NamedTemporaryFile(
+            prefix="hubctl-state-", suffix=".json", delete=False)
+        self.state.close()
+
+    def tearDown(self):
+        try:
+            os.unlink(self.state.name)
+        except OSError:
+            pass
+
     def test_start_switch_and_quit(self):
         hub = FakeHub()
         hub.start()
@@ -24,7 +36,8 @@ class AppPtyTests(unittest.TestCase):
         env = dict(os.environ, PYTHONPATH=str(ROOT / "src"),
                    TERM="xterm-256color", NO_COLOR="1")
         process = subprocess.Popen(
-            [sys.executable, "-m", "hubctl", "--port", hub.port, "--no-color"],
+            [sys.executable, "-m", "hubctl", "--port", hub.port,
+             "--no-color", "--state", self.state.name],
             stdin=slave, stdout=slave, stderr=slave,
             env=env, cwd=str(ROOT), close_fds=True)
         os.close(slave)
@@ -93,7 +106,7 @@ class AppPtyTests(unittest.TestCase):
                    TERM="xterm-256color", NO_COLOR="1")
         process = subprocess.Popen(
             [sys.executable, "-m", "hubctl", "--port", "/dev/ttyHUBNOPE",
-             "--no-color"],
+             "--no-color", "--state", self.state.name],
             stdin=slave, stdout=slave, stderr=slave,
             env=env, cwd=str(ROOT), close_fds=True)
         os.close(slave)

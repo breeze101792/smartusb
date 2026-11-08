@@ -212,6 +212,16 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(controller.power, [])
         self.assertEqual(controller.data, [])
 
+    def test_enter_on_the_poll_setting_types_a_value(self):
+        code, controller, terminal = run_loop(
+            [("m", 0.0), ("j", GAP), ("enter", 1.0), ("j", 1.5),
+             ("enter", 2.0), ("1", 2.1), (".", 2.2), ("5", 2.3),
+             ("enter", 2.9), ("q", 3.1), ("q", 3.3)])
+        self.assertEqual(code, 0)
+        self.assertEqual(controller.polls[-1], 1.5)
+        self.assertTrue(any(FOOTER_SETTINGS in line for line in footers(terminal)))
+        self.assertIn(FOOTER_CONTROL, footers(terminal)[-1])
+
     def test_space_opens_on_the_menu_and_backs_out_elsewhere(self):
         code, controller, _terminal = run_loop(
             [("m", 0.0), ("space", 0.1), ("d", 0.2), ("space", GAP),

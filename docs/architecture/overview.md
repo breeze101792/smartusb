@@ -39,6 +39,7 @@ TUI (raw ANSI)  ->  Controller  ->  DeviceDriver (HAL)  ->  4CH driver  ->  code
 | --- | --- | --- | --- |
 | CLI / TUI | `cli.py`, `app/tui.py`, `app/menu.py`, `app/view.py`, `app/term.py`, `app/policy.py` | arguments, terminal lifecycle, keys, menu and policy state, pure ANSI rendering | speak protocol, open a port |
 | Controller | `app/controller.py` | tick schedule, poll cycle, write verification, staleness, reconnect | format text, build frames |
+| State | `app/store.py` | the JSON state file: poll period and rules | know the engine |
 | HAL | `hal/base.py`, `hal/registry.py` | types, `DeviceDriver` ABC, error taxonomy, driver list | know termios or ANSI |
 | Discovery | `hal/discovery.py` | enumerate candidate endpoints per platform | open or write a port |
 | 4CH driver | `devices/smartusbhub/driver.py` | 4CH semantics: masks, mode, channel state, capabilities | know the UI |
@@ -279,11 +280,12 @@ downstream sysfs device map, non-interactive CLI output, mouse.
 | --- | --- | --- |
 | Codec matches documented and captured frames | vector tests, bad checksum resync, truncation | host — 8 pass |
 | Driver: identity, masks, reads, writes, rejection, silence, allow-list | pty fake device | host — 10 pass |
-| Controller: poll schedule, write verify, staleness, reconnect, settings, `set_power`, automatic writes | fake driver, injectable clock | host — 41 pass |
-| Menu model: port list, port detail, menu, Settings and policy, key routing | pure `menu` assertions | host — 44 pass |
+| Controller: poll schedule, write verify, staleness, reconnect, settings, `set_power`, automatic writes, state restore | fake driver, injectable clock | host — 44 pass |
+| State file: round trip, corrupt and foreign versions, bad values | temp dir | host — 7 pass |
+| Menu model: port list, port detail, menu, Settings and policy, key routing | pure `menu` assertions | host — 46 pass |
 | Render: frame, states, width/height sweep, clipping, selection, sixteen mockup frames | pure `render()` assertions | host — 55 pass |
 | Automatic control: rules, priority, gates, timers, retry cap, schedule, typed values, under-current cut, per-trigger actions | pure `decide()` truth tables | host — 61 pass |
-| TUI loop: screens, `a`/`p`, policy stepping and typing, usb map, per-key repeat guard | fake controller, terminal and clock | host — 26 pass |
+| TUI loop: screens, `a`/`p`, policy stepping and typing, usb map, per-key repeat guard | fake controller, terminal and clock | host — 27 pass |
 | Discovery filters `fe0c` and rejects `8091` | fake sysfs tree | host — 2 pass |
 | Key decode: arrows, lone Esc, unknown sequences ignored, plain keys | raw pipe fd | host — 4 pass |
 | Downstream USB map: hub discovery, port child, empty port, missing tree | fake sysfs tree | host — 4 pass |

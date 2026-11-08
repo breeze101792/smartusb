@@ -66,8 +66,10 @@ hubctl
 `d` the port is powered. The reason appears on the `last` line.
 
 Automatic control writes only while the link is LIVE in normal mode, one write
-per poll, and a manual `Space` wins for 5 s. Rules are session-only: they clear
-when `hubctl` exits. The overcurrent cut reads `0x04`, which is not metrology.
+per poll, and a manual `Space` wins for 5 s. The poll period and the rules are
+saved in `$XDG_STATE_HOME/hubctl/state.json` and restored at the next start; the
+pause flag and the timers are not, so a restart resumes. The overcurrent cut
+reads `0x04`, which is not metrology.
 
 Enter never switches. Terminal autorepeat can repeat a held Enter, so the only
 write keys are `Space` and `d`, and the 0.4 s guard is per key. Enter opens the

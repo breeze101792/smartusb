@@ -1,10 +1,13 @@
+import tempfile
 import time
 import unittest
+from pathlib import Path
 
-from hubctl.app import policy
+from hubctl.app import policy, store
 from hubctl.app.controller import Controller
 from hubctl.constants import (
     AUTO_MANUAL_HOLD_S,
+    POLL_INTERVAL_S,
     POLL_MAX_S,
     POLL_MIN_S,
     WRITE_SETTLE_S,
@@ -119,6 +122,53 @@ def run_cycle(controller, clock, ticks=15):
     for _ in range(ticks):
         clock.advance(0.05)
         controller.tick(clock())
+
+
+class PersistenceTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = Path(self.dir.name) / "hubctl" / "state.json"
+        self.clock = Clock()
+        self.driver = FakeDriver()
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def open(self, poll_interval=None):
+        return Controller(open_fn=lambda: self.driver, clock=self.clock,
+                          sleep=self.clock.sleep, state_path=self.path,
+                          poll_interval=poll_interval)
+
+    def test_the_poll_and_rules_survive_a_restart(self):
+        first = self.open()
+        first.set_poll(2.0)
+        rule = policy.Policy(enabled=True, overcurrent_ma=1800,
+                             under_ma=100, under_action=policy.ACTION_CYCLE)
+        first.set_policy(2, rule)
+        first.close()
+        poll, rules = store.load(self.path)
+        self.assertEqual(poll, 2.0)
+        self.assertEqual(rules[2], rule)
+        second = self.open()
+        self.assertEqual(second.snapshot().poll_interval_s, 2.0)
+        self.assertEqual(second.auto().policies[2], rule)
+        second.close()
+
+    def test_an_explicit_poll_interval_wins(self):
+        first = self.open()
+        first.set_poll(2.0)
+        first.close()
+        second = self.open(poll_interval=0.5)
+        self.assertEqual(second.snapshot().poll_interval_s, 0.5)
+        second.close()
+
+    def test_a_broken_state_file_does_not_stop_startup(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text("nope", encoding="utf-8")
+        controller = self.open()
+        self.assertEqual(controller.snapshot().poll_interval_s,
+                         POLL_INTERVAL_S)
+        controller.close()
 
 
 class ControllerTests(unittest.TestCase):

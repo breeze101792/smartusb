@@ -282,6 +282,14 @@ class MergedStatusTests(unittest.TestCase):
             auto=make_auto()))
         self.assertIn("1.8 A", text[2])
 
+    def test_the_settings_editor_shows_the_typed_poll(self):
+        text = plain(frame(make_snapshot(), menu.State(
+            menu.SETTINGS, settings_index=1, edit="2.0")))
+        self.assertIn("2.0 s", text[3])
+        lines = frame(make_snapshot(), menu.State(
+            menu.SETTINGS, settings_index=1, edit="0"))
+        self.assertIn("38;5;220", lines[3])
+
     def test_the_auto_help_page_explains_the_rules(self):
         text = plain(frame(make_snapshot(), menu.State(menu.AUTOHELP, port=2),
                            auto=make_auto()))
@@ -521,7 +529,7 @@ class AutoScreenTests(unittest.TestCase):
                            auto=make_auto()))
         self.assertIn("HUBCTL  AUTO - USB PORT 2", text[0])
         self.assertEqual(text[11].rstrip(" │"),
-                         "│   rules clear when hubctl exits")
+                         "│   rules are saved for the next run")
         self.assertEqual(text[10].strip(" │"), "Back")
 
     def test_policy_page_shows_every_value(self):

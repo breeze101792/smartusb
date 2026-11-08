@@ -184,11 +184,13 @@ Header title `HUBCTL  SETTINGS`. Status:
 | 4 | `poll` | `0.5 s`, `1.0 s`, `2.0 s`, `5.0 s` |
 
 Labels at column 5, values right-aligned at the rail. `j` and `k` select a row;
-`Space`, `Left` or `Right` step the value and wrap. `Back` is at row 11,
-selected.
+`Space`, `Left` or `Right` step the value and wrap. `Enter` edits the poll
+interval: digits and `.` fill the guarded buffer, `Enter` commits `0.1`..`5.0 s`
+and `Esc` cancels. On the `port` row `Enter` steps to the next endpoint.
+`Back` is at row 11, selected.
 
-Footer: `SPACE change   ENTER back   q back`. `Space`, `Enter`, `q`, `Esc` and `m`
-return to the control page.
+Footer: `ENTER edit   SPACE change   q back`. `q`, `Esc` and `m` return to the
+control page.
 
 Changing `port` closes the link, clears the identity and reopens at the new
 endpoint, or by discovery for `auto`. Changing `poll` takes effect on the next
@@ -213,7 +215,9 @@ every page, on the `last` row.
 | 10 | `to` | `00`..`23`, wraps; `--` while the schedule is off |
 | 11 | `Back` | |
 
-Row 12 is a dim line: `rules clear when hubctl exits`.
+Row 12 is a dim line: `rules are saved for the next run`. The poll period and
+the rules live in `$XDG_STATE_HOME/hubctl/state.json`; the pause flag and the
+timers do not, so a restart resumes.
 
 `j`/`k` select a row; `Space`, `Left` or `Right` step the value through its
 presets and wrap. `Enter` opens the `current` sub-page on that row, and a
@@ -344,7 +348,7 @@ The interlock banner is one line, naming the physical button on the unit:
 | `j`, `Down` | next port | next row | none | next item | next setting | none | none |
 | `k`, `Up` | previous port | previous row | none | previous item | previous setting | none | none |
 | `Left`, `Right` | none | step the value | none | none | step the value | none | none |
-| `Enter` | open port detail | open current or edit the value | back | open item | back | back | back |
+| `Enter` | open port detail | open current or edit the value | back | open item | edit poll | back | back |
 | `a` | open the selected port's policy | none | none | none | none | none | none |
 | `?` | none | auto help | none | none | auto help | none | none |
 | `p` | pause automation | pause automation | none | none | none | none | none |

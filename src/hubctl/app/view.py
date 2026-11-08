@@ -117,7 +117,7 @@ FOOTER_CONTROL_LOST = "r retry   a auto   p pause   q quit"
 FOOTER_NO_DEVICE = "r retry   a auto   p pause   q quit"
 FOOTER_MENU = "SPACE open   m close   q close"
 FOOTER_DEVICE = "SPACE back   q back"
-FOOTER_SETTINGS = "SPACE change   ENTER back   q back"
+FOOTER_SETTINGS = "ENTER edit   SPACE change   q back"
 FOOTER_AUTO = "ENTER open   p pause   q back"
 FOOTER_POLICY = "ENTER edit   SPACE change   p pause   q back"
 FOOTER_AUTO_HELP = "? close   q back"
@@ -592,8 +592,15 @@ def _settings_rows(snapshot, state, style, width):
     rows = {}
     selected = menu.index(snapshot, state)
     for offset, (label, value) in enumerate(menu.settings_rows(snapshot)):
+        field = menu.SETTINGS_ROWS[offset]
+        token = menu.TEXT
+        if state.edit is not None and offset == selected:
+            value = menu.edit_text(field, state.edit)
+            token = (menu.WARN
+                     if state.edit and not menu.edit_valid(field, state.edit)
+                     else menu.TEXT)
         rows[LIST_ROW + offset] = _pair_row(
-            label, value, menu.TEXT, style, width, selected=offset == selected)
+            label, value, token, style, width, selected=offset == selected)
     rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style, width)
     return rows
 

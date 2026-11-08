@@ -36,7 +36,7 @@ from ..hal.base import (
 )
 from ..hal.discovery import candidate_ports
 from ..hal.registry import open_first
-from . import policy
+from . import policy, store
 from .policy import Auto, Policy, PortAuto
 
 
@@ -65,11 +65,13 @@ class Controller:
     a reconnect cannot replay a switch against a device that came back.
     """
 
-    def __init__(self, open_fn=None, poll_interval: float = POLL_INTERVAL_S,
+    def __init__(self, open_fn=None, poll_interval: float | None = None,
                  clock=time.monotonic, sleep=time.sleep,
-                 port: str | None = None, trace=None, wall=time.time):
+                 port: str | None = None, trace=None, wall=time.time,
+                 state_path=None):
         self._port = port
         self._trace = trace
+        self._state_path = state_path
         self._open_fn = open_fn or (
             lambda: open_first(self._port, trace=self._trace))
         self._poll = poll_interval
@@ -99,12 +101,32 @@ class Controller:
         self._pending: dict[int, ChannelReading] = {}
         self._failures = 0
 
-        # ARCH-002 automation. In memory only; nothing is written on exit.
-        self._auto = policy.empty()
+        # ARCH-002 automation. The rules are restored from the state file.
+        self._auto = self._restore(poll_interval)
         self._poll_count = 0
         self._manual_poll: int | None = None
         self._observed: dict[int, bool | None] = {}
         self._wrote: dict[int, bool] = {}
+
+    def _restore(self, poll_interval: float | None) -> Auto:
+        """Load the saved poll and rules; an explicit value wins."""
+        stored = store.load(self._state_path) if self._state_path else None
+        if stored is None:
+            if poll_interval is None:
+                self._poll = POLL_INTERVAL_S
+            return policy.empty()
+        saved_poll, rules = stored
+        if poll_interval is None:
+            self._poll = saved_poll
+        return Auto(paused=False, policies=rules, state={})
+
+    def _save(self):
+        if self._state_path is None:
+            return
+        try:
+            store.save(self._state_path, self._poll, self._auto.policies)
+        except OSError as error:
+            self._note(f"state not saved - {error.strerror or error}", "warn")
 
     # --- lifecycle --------------------------------------------------------
     def close(self):
@@ -155,6 +177,7 @@ class Controller:
         for state in self._auto.state.values():
             state.pending_on_at = None
             state.pending_text = None
+        self._save()
         self._note(f"poll set to {seconds:.1f} s", "ok")
 
     # --- automation -------------------------------------------------------
@@ -179,6 +202,7 @@ class Controller:
                 state.pending_on_at = None
                 state.pending_text = None
                 state.low_since = None
+        self._save()
 
     def set_auto_paused(self, paused: bool):
         """Pause or resume automation. Pausing cancels the deferred work."""

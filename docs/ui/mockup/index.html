@@ -497,7 +497,7 @@ kbd{
 <span class="bd">│</span><span class="lab">   from        </span>                                                          08   <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">   to          </span>                                                          18   <span class="bd">│</span>
 <span class="bd">│</span>   <span class="lab">Back        </span>                                                               <span class="bd">│</span>
-<span class="bd">│</span>   <span class="dm">rules clear when hubctl exits</span>                                              <span class="bd">│</span>
+<span class="bd">│</span>   <span class="dm">rules are saved for the next run</span>                                           <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
@@ -531,7 +531,7 @@ kbd{
 <span class="bd">│</span><span class="lab">  from        </span>                                        08  <span class="bd">│</span>
 <span class="bd">│</span><span class="lab">  to          </span>                                        18  <span class="bd">│</span>
 <span class="bd">│</span>  <span class="lab">Back        </span>                                            <span class="bd">│</span>
-<span class="bd">│</span>  <span class="dm">rules clear when hubctl exits</span>                           <span class="bd">│</span>
+<span class="bd">│</span>  <span class="dm">rules are saved for the next run</span>                        <span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span>                                                          <span class="bd">│</span>
 <span class="bd">│</span>  <span class="dm">last</span>    <span class="ok">USB2 on - </span>   <span class="dm">port </span>/dev/ttyACM0   <span class="ok">live</span>   auto 2  <span class="bd">│</span>
@@ -867,9 +867,9 @@ kbd{
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>                                                                              <span class="bd">│</span>
 <span class="bd">│</span>   <span class="dm">last</span>    <span class="ok">connected HBP_USB2_4CH on</span>   <span class="dm">port </span>/dev/ttyACM0   1a86:fe0c   <span class="ok">live</span>   <span class="bd">│</span>
-<span class="bd">│</span><span class="bar">SPACE change   ENTER back   q back                                            </span><span class="bd">│</span></pre>
+<span class="bd">│</span><span class="bar">ENTER edit   SPACE change   q back                                            </span><span class="bd">│</span></pre>
       </div>
-      <figcaption class="notes"><p>Settings, reached from the menu. j and k choose port or poll; left and right step the value. Changing the port closes the link and reopens at the new endpoint; changing poll takes effect on the next cycle. Enter, q, Esc and m return to control.</p></figcaption>
+      <figcaption class="notes"><p>Settings, reached from the menu. j and k choose port or poll; Space or Left/Right steps the value and Enter types a poll interval. Changing the port closes the link and reopens at the new endpoint; changing poll takes effect on the next cycle. The poll and the rules are saved for the next run. q, Esc and m return to control.</p></figcaption>
     </figure>
 
   </div>
