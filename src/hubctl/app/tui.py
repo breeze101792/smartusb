@@ -14,7 +14,7 @@ from ..constants import (
     USB_REFRESH_S,
 )
 from ..hal import usbmap
-from . import menu
+from . import menu, policy
 from .controller import Controller
 from .term import Terminal
 from .view import render
@@ -51,6 +51,12 @@ def _execute(controller: Controller, action: menu.Action) -> None:
         controller.set_port(action.value)
     elif action.kind == menu.SET_POLL:
         controller.set_poll(action.value)
+    elif action.kind == menu.TOGGLE_PAUSE:
+        controller.set_auto_paused(not controller.auto().paused)
+    elif action.kind == menu.SET_POLICY:
+        field, delta = action.value
+        rule = controller.auto().policies.get(action.port, policy.Policy())
+        controller.set_policy(action.port, policy.step(rule, field, delta))
 
 
 def _loop(controller: Controller, terminal: Terminal, color: bool,
@@ -89,7 +95,7 @@ def _loop(controller: Controller, terminal: Terminal, color: bool,
                         usb_value = usbmap.port_device(state.port)
                     usb = usb_value
                 terminal.draw(render(snapshot, state, width, height,
-                                     color, utf8, usb))
+                                     color, utf8, usb, controller.auto()))
             last_draw = now
             dirty = False
 

@@ -1,17 +1,19 @@
 import unittest
 from unittest import mock
 
+from hubctl.app import policy
 from hubctl.app.tui import _loop
 from hubctl.app.view import (
     ANSI_RE,
     FOOTER_CONTROL,
     FOOTER_DEVICE,
     FOOTER_MENU,
+    FOOTER_POLICY,
     FOOTER_SETTINGS,
     FOOTER_NO_DEVICE,
 )
 
-from .helpers import make_no_device, make_snapshot
+from .helpers import make_auto, make_no_device, make_snapshot
 
 GAP = 0.5
 
@@ -32,12 +34,18 @@ class FakeController:
         self.data = []
         self.polls = []
         self.ports = []
+        self.pauses = []
+        self.policies = []
+        self._auto = make_auto()
 
     def tick(self, now):
         return False
 
     def snapshot(self):
         return self._snapshot
+
+    def auto(self):
+        return self._auto
 
     def request_refresh(self):
         self.refreshes += 1
@@ -53,6 +61,14 @@ class FakeController:
 
     def toggle_data(self, channel):
         self.data.append(channel)
+
+    def set_auto_paused(self, paused):
+        self.pauses.append(paused)
+        self._auto.paused = paused
+
+    def set_policy(self, port, rule):
+        self.policies.append((port, rule))
+        self._auto.policies[port] = rule
 
 
 class FakeTerminal:
@@ -185,7 +201,7 @@ class MenuTests(unittest.TestCase):
 
     def test_navigate_to_help_and_back(self):
         code, controller, terminal = run_loop(
-            [("m", 0.0), ("j", GAP), ("j", 1.0), ("enter", 1.5),
+            [("m", 0.0), ("j", GAP), ("j", 1.0), ("j", 1.2), ("enter", 1.5),
              ("q", 2.0), ("q", 2.5)])
         self.assertEqual(code, 0)
         self.assertTrue(any("HUBCTL  HELP" in line
@@ -214,6 +230,53 @@ class MenuTests(unittest.TestCase):
         self.assertTrue(any("HUBCTL  DEVICE" in line
                             for line in headers(terminal)))
         self.assertIn(FOOTER_NO_DEVICE, footers(terminal)[-1])
+
+
+class AutoTests(unittest.TestCase):
+    def test_a_opens_the_policy_for_the_selected_port_and_p_pauses(self):
+        code, controller, terminal = run_loop(
+            [("a", 0.0), ("p", GAP), ("j", 1.0), ("p", 1.5), ("q", 2.0),
+             ("q", 2.5)])
+        self.assertEqual(code, 0)
+        self.assertTrue(any("HUBCTL  AUTO - USB PORT 1" in line
+                            for line in headers(terminal)))
+        self.assertTrue(any(FOOTER_POLICY in line for line in footers(terminal)))
+        self.assertEqual(controller.pauses, [True, False])
+        self.assertTrue(any("auto paused" in ANSI_RE.sub("", line)
+                            for frame in terminal.frames for line in frame))
+        self.assertIn(FOOTER_CONTROL, footers(terminal)[-1])
+        self.assertEqual(controller.power, [])
+        self.assertEqual(controller.data, [])
+
+    def test_p_pauses_from_the_control_page(self):
+        code, controller, _terminal = run_loop(
+            [("p", 0.0), ("q", GAP)])
+        self.assertEqual(code, 0)
+        self.assertEqual(controller.pauses, [True])
+
+    def test_the_policy_page_steps_a_value_and_never_writes(self):
+        code, controller, terminal = run_loop(
+            [("a", 0.0), ("j", GAP), ("right", 1.0), ("right", 1.5),
+             ("q", 2.0), ("q", 2.5)])
+        self.assertEqual(code, 0)
+        self.assertTrue(any("HUBCTL  AUTO - USB PORT 1" in line
+                            for line in headers(terminal)))
+        self.assertTrue(any(FOOTER_POLICY in line for line in footers(terminal)))
+        self.assertEqual(len(controller.policies), 2)
+        port, rule = controller.policies[-1]
+        self.assertEqual(port, 1)
+        self.assertEqual(rule.cycle_s, 300)
+        self.assertEqual(controller.power, [])
+        self.assertEqual(controller.data, [])
+
+    def test_the_auto_pages_never_reach_the_power_or_data_path(self):
+        code, controller, _terminal = run_loop(
+            [("a", 0.0), ("space", GAP), ("d", 1.0), ("q", 1.5),
+             ("q", 2.0)])
+        self.assertEqual(code, 0)
+        self.assertEqual(controller.power, [])
+        self.assertEqual(controller.data, [])
+        self.assertEqual(controller.policies, [])
 
 
 class RefreshTests(unittest.TestCase):
@@ -259,9 +322,9 @@ class RefreshTests(unittest.TestCase):
 
     def test_settings_changes_poll_and_port(self):
         code, controller, terminal = run_loop(
-            [("m", 0.0), ("j", GAP), ("enter", 1.0), ("j", 1.5),
-             ("right", 2.0), ("k", 2.5), ("right", 3.0),
-             ("q", 3.5), ("q", 4.0)])
+            [("m", 0.0), ("j", GAP), ("j", 1.0), ("enter", 1.5),
+             ("j", 2.0), ("right", 2.5), ("k", 3.0), ("right", 3.5),
+             ("q", 4.0), ("q", 4.5)])
         self.assertEqual(code, 0)
         self.assertEqual(controller.polls, [2.0])
         self.assertEqual(controller.ports, [None])

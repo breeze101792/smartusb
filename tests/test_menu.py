@@ -18,16 +18,18 @@ class PortTests(unittest.TestCase):
 
 
 class ItemTests(unittest.TestCase):
-    def test_menu_has_device_settings_and_help(self):
+    def test_menu_has_device_auto_settings_and_help(self):
         entries = menu.items(menu.State(menu.MENU))
         self.assertEqual([item.label for item in entries],
-                         ["Device", "Settings", "Help"])
+                         ["Device", "Auto", "Settings", "Help"])
         self.assertEqual(entries[0].action, menu.OPEN_DEVICE)
-        self.assertEqual(entries[1].action, menu.OPEN_SETTINGS)
-        self.assertEqual(entries[2].action, menu.OPEN_HELP)
+        self.assertEqual(entries[1].action, menu.OPEN_AUTO)
+        self.assertEqual(entries[2].action, menu.OPEN_SETTINGS)
+        self.assertEqual(entries[3].action, menu.OPEN_HELP)
 
     def test_device_and_help_have_back_only(self):
-        for screen in (menu.DEVICE, menu.SETTINGS, menu.HELP):
+        for screen in (menu.DEVICE, menu.SETTINGS, menu.HELP,
+                       menu.POLICY):
             entries = menu.items(menu.State(screen))
             self.assertEqual([item.label for item in entries], ["Back"])
             self.assertEqual(entries[0].action, menu.BACK)
@@ -182,7 +184,7 @@ class KeyTests(unittest.TestCase):
         self.assertEqual(back.screen, menu.CONTROL)
 
     def test_enter_on_help_returns_to_control(self):
-        state = menu.State(menu.MENU, menu_index=2)
+        state = menu.State(menu.MENU, menu_index=3)
         help, action = menu.handle_key(self.snapshot, state, "enter")
         self.assertIsNone(action)
         self.assertEqual(help.screen, menu.HELP)
@@ -203,7 +205,7 @@ class KeyTests(unittest.TestCase):
         self.assertEqual(action.value, 2.0)
 
     def test_enter_on_settings_returns_to_control(self):
-        state = menu.State(menu.MENU, menu_index=1)
+        state = menu.State(menu.MENU, menu_index=2)
         settings, action = menu.handle_key(self.snapshot, state, "enter")
         self.assertIsNone(action)
         self.assertEqual(settings.screen, menu.SETTINGS)
@@ -272,7 +274,80 @@ class KeyTests(unittest.TestCase):
             self.assertEqual(action.kind, menu.QUIT)
 
     def test_guarded_keys(self):
-        self.assertEqual(menu.GUARDED_KEYS, ("enter", "space", "d", "m"))
+        self.assertEqual(menu.GUARDED_KEYS,
+                         ("enter", "space", "d", "m", "p"))
+
+
+class AutoTests(unittest.TestCase):
+    def setUp(self):
+        self.snapshot = make_snapshot(channels=4)
+
+    def test_menu_opens_auto_for_the_selected_port(self):
+        state = menu.State(menu.MENU, menu_index=1, port_index=2)
+        opened, action = menu.handle_key(self.snapshot, state, "enter")
+        self.assertIsNone(action)
+        self.assertEqual(opened.screen, menu.POLICY)
+        self.assertEqual(opened.port, 3)
+        for index, screen in ((0, menu.DEVICE), (2, menu.SETTINGS),
+                              (3, menu.HELP)):
+            state, action = menu.handle_key(
+                self.snapshot, menu.State(menu.MENU, menu_index=index),
+                "enter")
+            self.assertIsNone(action)
+            self.assertEqual(state.screen, screen)
+
+    def test_a_opens_the_policy_for_the_selected_port(self):
+        state, action = menu.handle_key(
+            self.snapshot, menu.State(port_index=2), "a")
+        self.assertIsNone(action)
+        self.assertEqual(state.screen, menu.POLICY)
+        self.assertEqual(state.port, 3)
+        self.assertEqual(state.policy_index, 0)
+
+    def test_a_does_nothing_off_the_control_page(self):
+        for screen in (menu.MENU, menu.DEVICE, menu.POLICY, menu.SETTINGS,
+                       menu.HELP):
+            state, action = menu.handle_key(
+                self.snapshot, menu.State(screen), "a")
+            self.assertIsNone(action)
+            self.assertEqual(state.screen, screen)
+
+    def test_p_asks_for_pause_only_where_pause_is_offered(self):
+        for screen in (menu.CONTROL, menu.POLICY):
+            state, action = menu.handle_key(
+                self.snapshot, menu.State(screen), "p")
+            self.assertEqual(action.kind, menu.TOGGLE_PAUSE)
+            self.assertEqual(state.screen, screen)
+        for screen in (menu.MENU, menu.PORT, menu.DEVICE, menu.SETTINGS,
+                       menu.HELP):
+            _state, action = menu.handle_key(
+                self.snapshot, menu.State(screen), "p")
+            self.assertIsNone(action)
+
+    def test_policy_navigation_wraps_over_the_rows_and_back(self):
+        state = menu.State(menu.POLICY, port=2)
+        self.assertEqual(menu.index(self.snapshot, state), 0)
+        moved, _ = menu.handle_key(self.snapshot, state, "j")
+        self.assertEqual(menu.index(self.snapshot, moved), 1)
+        last = menu.State(menu.POLICY, port=2,
+                          policy_index=len(menu.POLICY_ROWS))
+        self.assertEqual(menu.index(self.snapshot, last), len(menu.POLICY_ROWS))
+        wrapped, _ = menu.handle_key(self.snapshot, last, "j")
+        self.assertEqual(menu.index(self.snapshot, wrapped), 0)
+
+    def test_enter_q_escape_and_m_return_to_control(self):
+        for key in ("enter", "q", "escape", "m"):
+            state = menu.State(menu.POLICY, port=2)
+            back, action = menu.handle_key(self.snapshot, state, key)
+            self.assertIsNone(action)
+            self.assertEqual(back.screen, menu.CONTROL, key)
+
+    def test_space_and_d_do_nothing_on_the_policy_page(self):
+        for key in ("space", "d"):
+            moved, action = menu.handle_key(
+                self.snapshot, menu.State(menu.POLICY, port=2), key)
+            self.assertIsNone(action)
+            self.assertEqual(moved.screen, menu.POLICY)
 
 
 if __name__ == "__main__":

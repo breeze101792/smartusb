@@ -1,5 +1,6 @@
 """Snapshots, frames and plain text shared by the host tests."""
 
+from hubctl.app import policy
 from hubctl.app.view import ANSI_RE, render
 from hubctl.hal.base import (
     ChannelReading,
@@ -12,6 +13,20 @@ from hubctl.hal.base import (
 
 SELECTED = "\x1b[1;7m"
 PRODUCT = "HBP_USB2_4CH"
+
+
+def make_auto(paused=False, policies=None):
+    """The automation state of mockup frames N, O, P and Q."""
+    if policies is None:
+        policies = {
+            1: policy.Policy(),
+            2: policy.Policy(enabled=True, cycle_s=600, overcurrent_ma=1500,
+                             retry_s=30, recovery_s=300,
+                             schedule=(8 * 60, 18 * 60)),
+            3: policy.Policy(enabled=True, cycle_s=1800),
+            4: policy.Policy(),
+        }
+    return policy.Auto(paused=paused, policies=dict(policies), state={})
 
 
 def readings(channels=4):

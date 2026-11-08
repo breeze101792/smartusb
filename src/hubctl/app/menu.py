@@ -6,17 +6,20 @@ from dataclasses import dataclass, replace
 
 from ..constants import MAX_CHANNELS, POLL_CHOICES_S
 from ..hal.base import ChannelReading, LinkState, Snapshot
+from . import policy
 
 # Screens. The control page is the only page; the menu opens over it.
 CONTROL = "control"
 PORT = "port"
 MENU = "menu"
+POLICY = "policy"
 DEVICE = "device"
 SETTINGS = "settings"
 HELP = "help"
 
 # Item actions.
 OPEN_DEVICE = "open-device"
+OPEN_AUTO = "open-auto"
 OPEN_SETTINGS = "open-settings"
 OPEN_HELP = "open-help"
 BACK = "back"
@@ -26,6 +29,8 @@ TOGGLE_POWER = "toggle-power"
 TOGGLE_DATA = "toggle-data"
 SET_PORT = "set-port"
 SET_POLL = "set-poll"
+TOGGLE_PAUSE = "toggle-pause"
+SET_POLICY = "set-policy"
 
 # Style tokens, docs/ui/menu.md section 7.
 TEXT = "text"
@@ -36,16 +41,21 @@ ERR = "err"
 RAIL = "rail"
 
 LABEL_DEVICE = "Device"
+LABEL_AUTO = "Auto"
 LABEL_SETTINGS = "Settings"
 LABEL_HELP = "Help"
 LABEL_BACK = "Back"
 MENU_HEADING = "GLOBAL MENU"
 PORT_LABEL = "USB PORT"
+AUTO_MARKER = "A"
+AUTO_NOTE = "rules clear when hubctl exits"
+AUTO_TITLE = "HUBCTL  AUTO"
+POLICY_ROWS = policy.POLICY_FIELDS
 
 DEVICE_FIELD_LABELS = ("ports", "product", "firmware", "hardware", "address",
                        "buttons", "restore")
 
-GUARDED_KEYS = ("enter", "space", "d", "m")
+GUARDED_KEYS = ("enter", "space", "d", "m", "p")
 
 NEXT_KEYS = ("j", "down")
 PREVIOUS_KEYS = ("k", "up")
@@ -60,6 +70,8 @@ class State:
     port_index: int = 0
     menu_index: int = 0
     settings_index: int = 0
+    auto_index: int = 0
+    policy_index: int = 0
     port: int = 0
 
 
@@ -91,6 +103,8 @@ class Readout:
     voltage_live: bool
     current_text: str
     current_live: bool
+    watt_text: str
+    watt_live: bool
 
 
 def port_label(number: int) -> str:
@@ -109,9 +123,10 @@ def items(state: State) -> list[Item]:
     """The selectable menu and device rows. The control list is the ports."""
     if state.screen == MENU:
         return [Item(LABEL_DEVICE, OPEN_DEVICE),
+                Item(LABEL_AUTO, OPEN_AUTO),
                 Item(LABEL_SETTINGS, OPEN_SETTINGS),
                 Item(LABEL_HELP, OPEN_HELP)]
-    if state.screen in (PORT, DEVICE, SETTINGS, HELP):
+    if state.screen in (PORT, DEVICE, SETTINGS, HELP, POLICY):
         return [Item(LABEL_BACK, BACK)]
     return []
 
@@ -122,6 +137,8 @@ def index(snapshot: Snapshot, state: State) -> int:
         return max(0, min(state.menu_index, len(items(state)) - 1))
     if state.screen == SETTINGS:
         return max(0, min(state.settings_index, len(SETTINGS_ROWS) - 1))
+    if state.screen == POLICY:
+        return max(0, min(state.policy_index, len(POLICY_ROWS)))
     if state.screen in (PORT, DEVICE, HELP):
         return 0
     count = port_count(snapshot)
@@ -145,8 +162,18 @@ def handle_key(snapshot: Snapshot, state: State,
         return _enter(snapshot, state)
     if key == "m":
         return _menu(state)
+    if key == "a" and state.screen == CONTROL:
+        count = port_count(snapshot)
+        if count == 0:
+            return state, None
+        return replace(state, screen=POLICY, port=index(snapshot, state) + 1,
+                       policy_index=0), None
+    if key == "p" and state.screen in (CONTROL, POLICY):
+        return state, Action(TOGGLE_PAUSE)
     if state.screen == SETTINGS and key in ("left", "right"):
         return _change(snapshot, state, 1 if key == "right" else -1)
+    if state.screen == POLICY and key in ("left", "right"):
+        return _step(state, 1 if key == "right" else -1)
     if key == "space":
         return _write(snapshot, state, TOGGLE_POWER)
     if key == "d":
@@ -199,6 +226,9 @@ def readout(snapshot: Snapshot, port: int) -> Readout:
         voltage_live=power_on is True and reading.voltage_mv is not None,
         current_text=_current_text(reading, unknown),
         current_live=not unknown and reading.current_ma is not None,
+        watt_text=_watt_text(reading, unknown),
+        watt_live=(not unknown and reading.voltage_mv is not None
+                   and reading.current_ma is not None),
     )
 
 
@@ -250,7 +280,7 @@ def _menu(state: State) -> tuple[State, Action | None]:
 
 def _enter(snapshot: Snapshot,
            state: State) -> tuple[State, Action | None]:
-    """Enter runs the selected menu item and backs out of Device.
+    """Enter runs the selected menu item and backs out of the detail pages.
 
     Enter never writes and does nothing on the control page.
     """
@@ -260,9 +290,18 @@ def _enter(snapshot: Snapshot,
             return state, None
         return replace(state, screen=PORT,
                        port=index(snapshot, state) + 1), None
+    if state.screen == POLICY:
+        return replace(state, screen=CONTROL, port=0), None
     item = items(state)[index(snapshot, state)]
     if item.action == OPEN_DEVICE:
         return replace(state, screen=DEVICE), None
+    if item.action == OPEN_AUTO:
+        count = port_count(snapshot)
+        if count == 0:
+            return state, None
+        return replace(state, screen=POLICY,
+                       port=min(state.port_index, count - 1) + 1,
+                       policy_index=0), None
     if item.action == OPEN_SETTINGS:
         return replace(state, screen=SETTINGS, settings_index=0), None
     if item.action == OPEN_HELP:
@@ -281,7 +320,7 @@ def _write(snapshot: Snapshot, state: State,
 
 
 def _move(snapshot: Snapshot, state: State, delta: int) -> State:
-    """j and k wrap the port list and the menu; Device and Help have one row."""
+    """j and k wrap every list; Device and Help have one row."""
     if state.screen == CONTROL:
         count = port_count(snapshot)
         if count == 0:
@@ -294,7 +333,78 @@ def _move(snapshot: Snapshot, state: State, delta: int) -> State:
         count = len(SETTINGS_ROWS)
         return replace(state,
                        settings_index=(index(snapshot, state) + delta) % count)
+    if state.screen == POLICY:
+        count = len(POLICY_ROWS) + 1
+        return replace(state,
+                       policy_index=(index(snapshot, state) + delta) % count)
     return state
+
+
+def _step(state: State, delta: int) -> tuple[State, Action | None]:
+    """Left and right step the selected policy value."""
+    position = max(0, min(state.policy_index, len(POLICY_ROWS)))
+    if position >= len(POLICY_ROWS) or state.port < 1:
+        return state, None
+    field = POLICY_ROWS[position]
+    return state, Action(SET_POLICY, port=state.port, value=(field, delta))
+
+
+def auto_summary(rule: policy.Policy) -> list[tuple[str, str]]:
+    """The Auto list summary as (text, token) pieces, menu.md section 3.5."""
+    if not rule.enabled:
+        return [("off", DIM)]
+    pieces = [("on", OK)]
+    rest = ""
+    if rule.cycle_s is not None:
+        rest += f" cyc{rule.cycle_s // 60}"
+    if rule.overcurrent_ma is not None:
+        rest += f" oc{rule.overcurrent_ma / 1000:.1f}"
+        if rule.retry_s is not None:
+            rest += f"/{rule.retry_s}"
+    if rule.recovery_s is not None:
+        rest += f" rec{rule.recovery_s // 60}"
+    if rule.schedule is not None:
+        start, end = rule.schedule
+        rest += f" sch{start // 60}-{end // 60}"
+    if rest:
+        pieces.append((rest, TEXT))
+    return pieces
+
+
+def policy_row(rule: policy.Policy,
+               field: str) -> tuple[str, str, str]:
+    """One policy page row: label, value text and its token."""
+    if field == "enabled":
+        return ("enabled", *_on_off(rule.enabled))
+    if field == "cycle":
+        return ("cycle", *_minutes(rule.cycle_s))
+    if field == "overcurrent":
+        if rule.overcurrent_ma is None:
+            return ("overcurrent", "off", DIM)
+        return ("overcurrent", f"{rule.overcurrent_ma / 1000:.1f} A", TEXT)
+    if field == "retry":
+        if rule.retry_s is None:
+            return ("retry", "off", DIM)
+        return ("retry", f"{rule.retry_s} s", TEXT)
+    if field == "recovery":
+        return ("recovery", *_minutes(rule.recovery_s))
+    if field == "schedule":
+        return ("schedule", *_on_off(rule.schedule is not None))
+    window = rule.schedule
+    if window is None:
+        return (field, "--", DIM)
+    minutes = window[0] if field == "from" else window[1]
+    return (field, f"{minutes // 60:02d}", TEXT)
+
+
+def _on_off(value: bool) -> tuple[str, str]:
+    return ("on", OK) if value else ("off", DIM)
+
+
+def _minutes(seconds: int | None) -> tuple[str, str]:
+    if seconds is None:
+        return ("off", DIM)
+    return (f"{seconds // 60} min", TEXT)
 
 
 def _power_text(reading: ChannelReading, unknown: bool) -> str:
@@ -325,3 +435,9 @@ def _current_text(reading: ChannelReading, unknown: bool) -> str:
     if unknown or reading.current_ma is None:
         return "?"
     return f"{reading.current_ma / 1000:.2f} A"
+
+
+def _watt_text(reading: ChannelReading, unknown: bool) -> str:
+    if unknown or reading.voltage_mv is None or reading.current_ma is None:
+        return "?"
+    return f"{reading.voltage_mv * reading.current_ma / 1_000_000:.2f} W"

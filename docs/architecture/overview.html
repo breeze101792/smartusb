@@ -134,7 +134,7 @@
     <div class="side">
       <div class="stack">
         <div class="layer">
-          <div class="layer-head"><span class="tag">TUI</span><span class="files">app/tui.py &middot; app/view.py &middot; app/term.py</span></div>
+          <div class="layer-head"><span class="tag">TUI</span><span class="files">app/tui.py &middot; app/menu.py &middot; app/view.py &middot; app/policy.py &middot; app/term.py</span></div>
           <p>Raw ANSI, alternate screen, key dispatch, resize. <code>render()</code> returns styled lines; it never touches a device.</p>
         </div>
         <div class="arrow">Snapshot, screen state &middot; key intents</div>
@@ -219,6 +219,8 @@
         <tr><td><code>devices/smartusbhub/transport.py</code></td><td>fd, lock, allow-list, select, drain</td><td class="muted">interpret channel state</td></tr>
         <tr><td><code>devices/smartusbhub/driver.py</code></td><td>4CH semantics and capability flags</td><td class="muted">know the UI</td></tr>
         <tr><td><code>app/controller.py</code></td><td>session, schedule, write verification, reconnect</td><td class="muted">format text or build frames</td></tr>
+        <tr><td><code>app/menu.py</code></td><td>screens, items, key routing</td><td class="muted">perform I/O</td></tr>
+        <tr><td><code>app/policy.py</code></td><td>automatic-control rules and timers</td><td class="muted">perform I/O or read the clock</td></tr>
         <tr><td><code>app/term.py</code></td><td>raw mode, alternate screen, size, key decode, frame write</td><td class="muted">speak protocol</td></tr>
         <tr><td><code>app/view.py</code></td><td>ANSI layout and formatting</td><td class="muted">perform I/O or read the clock</td></tr>
         <tr><td><code>app/tui.py</code></td><td>loop and input handling</td><td class="muted">speak protocol</td></tr>
@@ -271,6 +273,7 @@ ChannelReading(power, data, voltage_mv, current_ma)   <span class="c"># None = n
       <div class="card"><div class="id">INV-005</div><h3>Identity gate</h3><p>A reconnect resumes only when product, hardware, firmware, channels, and address match. A different unit stays LOST.</p></div>
       <div class="card"><div class="id">INV-006</div><h3>Controls only when LIVE</h3><p>A stale value is dimmed and cannot be acted on. A readback mismatch is reported, not treated as a broken link.</p></div>
       <div class="card"><div class="id">INV-007</div><h3>One owner</h3><p><code>flock(LOCK_EX | LOCK_NB)</code> on the fd. Two instances, or <code>lab_verify</code>, cannot split frames.</p></div>
+      <div class="card"><div class="id">INV-009</div><h3>Automation stays gated</h3><p>An automatic write needs a LIVE link and normal mode, one write per poll, and a manual <code>Space</code> wins for 5 s. Rules are session-only.</p></div>
       <div class="card"><div class="id">INV-008</div><h3>Terminal restored</h3><p>Raw-mode enter and leave in a <code>finally</code>, plus SIGTERM/SIGHUP handling. A crash does not leave the shell in raw mode.</p></div>
     </div>
   </section>

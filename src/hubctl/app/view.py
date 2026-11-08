@@ -6,6 +6,8 @@ import re
 
 from .. import __version__
 from ..constants import (
+    AUTO_MAX_POLL_S,
+    AUTO_NOTE_ROW,
     BAR_LEFT_COL,
     BAR_RIGHT_FROM_END,
     BANNER_ROW,
@@ -32,9 +34,11 @@ from ..constants import (
     VID,
     VOLTAGE_COL,
     VOLTAGE_WIDTH,
+    WATT_COL,
+    WATT_WIDTH,
 )
 from ..hal.base import LinkState, Mode, Snapshot
-from . import menu
+from . import menu, policy
 
 ESC = "\x1b["
 RESET = f"{ESC}0m"
@@ -55,13 +59,21 @@ TOKENS = {
     menu.RAIL: ("", C_RAIL),
 }
 
-PORT_CELLS = (
-    (LABEL_COL, LABEL_WIDTH),
-    (POWER_COL, POWER_WIDTH),
-    (DATA_COL, DATA_WIDTH),
-    (VOLTAGE_COL, VOLTAGE_WIDTH),
-    (CURRENT_COL, CURRENT_WIDTH),
-)
+def port_columns(width):
+    """The label plus five value cells, spread across the window."""
+    widths = (POWER_WIDTH, DATA_WIDTH, VOLTAGE_WIDTH, CURRENT_WIDTH,
+              WATT_WIDTH)
+    label = _label_col(width)
+    left = label + LABEL_WIDTH
+    right = _content_end(width)
+    spare = right - left - sum(widths)
+    gap = max(2, spare // (len(widths) - 1)) if len(widths) > 1 else 2
+    columns = [(label, LABEL_WIDTH)]
+    column = left
+    for cell in widths:
+        columns.append((column, cell))
+        column += cell + gap
+    return tuple(columns)
 
 TITLE_CONTROL = "HUBCTL  USB CONTROL"
 TITLE_DEVICE = "HUBCTL  DEVICE"
@@ -82,12 +94,14 @@ INTERLOCK_BANNER = "! interlock - switching disabled. Hold CH1 3 s, then r."
 NO_DEVICE_WARN = "no SmartUSBHub CMD port"
 NO_DEVICE_HINT = "connect the CMD USB-C port, or pass --port /dev/ttyACM0."
 
-FOOTER_CONTROL = "SPACE power   d data   m menu   q quit"
-FOOTER_CONTROL_LOST = "SPACE power   d data   r retry   m menu   q quit"
-FOOTER_NO_DEVICE = "r retry   m menu   q quit"
+FOOTER_CONTROL = "SPACE power   d data   a auto   p pause   q quit"
+FOOTER_CONTROL_LOST = "r retry   a auto   p pause   q quit"
+FOOTER_NO_DEVICE = "r retry   a auto   p pause   q quit"
 FOOTER_MENU = "ENTER open   m close   q close"
 FOOTER_DEVICE = "ENTER back   q back"
 FOOTER_SETTINGS = "LEFT/RIGHT change   ENTER back   q back"
+FOOTER_AUTO = "ENTER open   p pause   q back"
+FOOTER_POLICY = "LEFT/RIGHT change   p pause   ENTER back   q back"
 
 
 class Style:
@@ -150,8 +164,25 @@ def _inner(width):
     return width - BAR_LEFT_COL - BAR_RIGHT_FROM_END + 1
 
 
+def _pad(width):
+    """Equal space inside each rail; one less at the minimum width."""
+    return 3 if width >= 72 else 2
+
+
+def _label_col(width):
+    return BAR_LEFT_COL + _pad(width)
+
+
+def _content_end(width):
+    return width - 1 - _pad(width)
+
+
 def _indent(column):
     return " " * (column - BAR_LEFT_COL)
+
+
+def _label_indent(width):
+    return " " * _pad(width)
 
 
 def _body(content, width, style, glyph):
@@ -177,27 +208,28 @@ def _footer(text, width, style, glyph):
     return _body(style(bar, bold=True, rev=True), width, style, glyph)
 
 
-def _row(cells, style):
-    """Lay cells out at their fixed columns, filling the gaps with spaces."""
+def _row(cells, style, columns):
+    """Lay cells out at the given columns, filling the gaps with spaces."""
     out = []
-    column = LABEL_COL
-    for (target, width), (text, token, bold) in zip(PORT_CELLS, cells):
+    column = columns[0][0]
+    for (target, width), (text, token, bold) in zip(columns, cells):
         out.append(" " * (target - column))
         out.append(style(pad(text, width), token, bold=bold))
         column = target + width
     return "".join(out)
 
 
-def _port_row(snapshot, number, selected, style):
+def _port_row(snapshot, number, selected, style, width, marked=False):
     values = menu.readout(snapshot, number)
     if snapshot.link == LinkState.STALE:
-        tokens = (menu.DIM,) * 4
+        tokens = (menu.DIM,) * 5
     else:
         tokens = (
             menu.OK if values.power_on else menu.DIM,
             menu.OK if values.data_on else menu.DIM,
             menu.TEXT if values.voltage_live else menu.DIM,
             menu.TEXT if values.current_live else menu.DIM,
+            menu.TEXT if values.watt_live else menu.DIM,
         )
     cells = (
         (menu.port_label(number), menu.TEXT, True),
@@ -205,27 +237,42 @@ def _port_row(snapshot, number, selected, style):
         (values.data_text, tokens[1], False),
         (values.voltage_text, tokens[2], False),
         (values.current_text, tokens[3], False),
+        (values.watt_text, tokens[4], False),
     )
+    if marked:
+        lead = " " * (_pad(width) - 2) + style(
+            menu.AUTO_MARKER, menu.TEXT, bold=True) + " "
+    else:
+        lead = _label_indent(width)
+    columns = port_columns(width)
     if selected:
-        return (_indent(LABEL_COL)
-                + style(_row(cells, _plain), bold=True, rev=True))
-    return _indent(LABEL_COL) + _row(cells, style)
+        return lead + style(_row(cells, _plain, columns), bold=True, rev=True)
+    return lead + _row(cells, style, columns)
 
 
-def _item_row(item, selected, style):
+def _item_row(item, selected, style, width):
     if selected:
-        return (_indent(LABEL_COL)
+        return (_label_indent(width)
                 + style(item.label + " ", bold=True, rev=True))
-    return (_indent(LABEL_COL)
+    return (_label_indent(width)
             + style(pad(item.label, LABEL_WIDTH), menu.TEXT, bold=True))
 
 
-def _field_row(label, value, known, style):
-    token = menu.TEXT if known else menu.DIM
-    return (_indent(LABEL_COL)
-            + style(pad(label, DEVICE_VALUE_COL - LABEL_COL), menu.TEXT,
-                    bold=True)
+def _pair_row(label, value, token, style, width, selected=False):
+    """A label on the left, its value right-aligned at the rail."""
+    prefix = _label_indent(width) + pad(label, LABEL_WIDTH)
+    end = _content_end(width)
+    gap = " " * max(1, end - (_label_col(width) + LABEL_WIDTH - 1)
+                    - vlen(value))
+    if selected:
+        return style(prefix + gap + value, bold=True, rev=True)
+    return (style(prefix, menu.TEXT, bold=True) + gap
             + style(value, token))
+
+
+def _field_row(label, value, known, style, width):
+    token = menu.TEXT if known else menu.DIM
+    return _pair_row(label, value, token, style, width)
 
 
 def _link(snapshot):
@@ -266,121 +313,171 @@ def _port(snapshot):
     return "?" if snapshot.identity is None else snapshot.identity.port
 
 
-def _main_status(snapshot, style):
+def _auto_field(snapshot, auto):
+    """The status line's automation field, docs/ui/menu.md section 3.1."""
+    if auto is None:
+        return None
+    if snapshot.poll_interval_s > AUTO_MAX_POLL_S:
+        return "auto off - poll too long", menu.WARN
+    if auto.paused:
+        return "auto paused", menu.WARN
+    enabled = sum(1 for rule in auto.policies.values() if rule.enabled)
+    if enabled == 0:
+        return None
+    return f"auto {enabled}", menu.TEXT
+
+
+def _main_status(snapshot, style, width, auto=None):
     mode, mode_token = _mode(snapshot)
     link, link_token = _link(snapshot)
-    return (_indent(STATUS_COL) + style("port ", menu.DIM)
-            + style(_port(snapshot), menu.TEXT)
-            + "   " + style(mode, mode_token)
-            + "   " + style(link, link_token)
-            + "   " + style(f"poll {snapshot.poll_interval_s:.1f} s", menu.DIM))
+    head = [
+        ("port ", menu.DIM),
+        (_port(snapshot), menu.TEXT),
+        ("   ", None),
+        (mode, mode_token),
+        ("   ", None),
+        (link, link_token),
+    ]
+    poll = [(f"   poll {snapshot.poll_interval_s:.1f} s", menu.DIM)]
+    field = _auto_field(snapshot, auto)
+    tail = [] if field is None else [("   ", None), field]
+    room = _inner(width) - _pad(width)
+
+    def size(pieces):
+        return sum(len(text) for text, _token in pieces)
+
+    pieces = head + poll + tail
+    if size(pieces) > room:
+        # At 60 columns the poll goes first; the auto field never does.
+        pieces = head + tail
+    text = "".join(style(value, token) for value, token in pieces)
+    return _label_indent(width) + text
 
 
-def _discovery_status(snapshot, style):
-    return (_indent(STATUS_COL) + style("discovery ", menu.DIM)
+def _discovery_status(snapshot, style, width):
+    return (_label_indent(width) + style("discovery ", menu.DIM)
             + style(f"{VID}:{PID}", menu.TEXT)
             + "   " + style("no port", menu.WARN)
             + "   " + style(f"retry {_retry(snapshot)}", menu.DIM))
 
 
-def _status_row(snapshot, style):
+def _status_row(snapshot, style, width, auto=None):
     if snapshot.identity is None:
-        return _discovery_status(snapshot, style)
-    return _main_status(snapshot, style)
+        return _discovery_status(snapshot, style, width)
+    return _main_status(snapshot, style, width, auto)
 
 
-def _device_status(snapshot, style):
+def _device_status(snapshot, style, width):
     link, link_token = _link(snapshot)
-    return (_indent(STATUS_COL) + style("port ", menu.DIM)
+    return (_label_indent(width) + style("port ", menu.DIM)
             + style(_port(snapshot), menu.TEXT)
             + "   " + style(f"{VID}:{PID}", menu.TEXT)
             + "   " + style(link, link_token))
 
 
-def _last_row(snapshot, style):
+def _last_row(snapshot, style, width):
     token = (snapshot.last_kind
              if snapshot.last_kind in (menu.OK, menu.WARN, menu.ERR)
              else menu.TEXT)
-    return (_indent(LAST_LABEL_COL)
+    return (_label_indent(width)
             + pad(style(LAST_LABEL, menu.DIM), LAST_TEXT_COL - LAST_LABEL_COL)
             + style(snapshot.last_action, token))
 
 
-def _banner_row(snapshot, style):
+def _banner_row(snapshot, style, width):
     if snapshot.status.mode != Mode.INTERLOCK:
         return None
-    return _indent(LABEL_COL) + style(INTERLOCK_BANNER, menu.WARN)
+    return _label_indent(width) + style(INTERLOCK_BANNER, menu.WARN)
 
 
-def _control_rows(snapshot, state, style):
-    rows = {STATUS_ROW: _status_row(snapshot, style)}
+def _control_rows(snapshot, state, style, width, auto=None):
+    rows = {STATUS_ROW: _status_row(snapshot, style, width, auto)}
     if snapshot.identity is None:
-        rows[LIST_ROW] = _indent(LABEL_COL) + style(NO_DEVICE_WARN, menu.WARN)
-        rows[LIST_ROW + 1] = (_indent(LABEL_COL)
+        rows[LIST_ROW] = _label_indent(width) + style(NO_DEVICE_WARN, menu.WARN)
+        rows[LIST_ROW + 1] = (_label_indent(width)
                               + style(NO_DEVICE_HINT, menu.DIM))
         return rows
-    banner = _banner_row(snapshot, style)
+    banner = _banner_row(snapshot, style, width)
     if banner is not None:
         rows[BANNER_ROW] = banner
     selected = menu.index(snapshot, state)
+    rules = auto.policies if auto is not None else {}
     for offset in range(menu.port_count(snapshot)):
-        rows[LIST_ROW + offset] = _port_row(snapshot, offset + 1,
-                                            offset == selected, style)
+        rule = rules.get(offset + 1)
+        rows[LIST_ROW + offset] = _port_row(
+            snapshot, offset + 1, offset == selected, style, width,
+            marked=rule is not None and rule.enabled)
     return rows
 
 
-def _menu_rows(snapshot, state, style):
-    rows = {STATUS_ROW: _status_row(snapshot, style)}
-    banner = _banner_row(snapshot, style)
+def _menu_rows(snapshot, state, style, width, auto=None):
+    rows = {STATUS_ROW: _status_row(snapshot, style, width, auto)}
+    banner = _banner_row(snapshot, style, width)
     if banner is not None:
         rows[BANNER_ROW] = banner
-    rows[LIST_ROW] = _indent(LABEL_COL) + style(menu.MENU_HEADING, menu.DIM)
+    rows[LIST_ROW] = _label_indent(width) + style(menu.MENU_HEADING, menu.DIM)
     selected = menu.index(snapshot, state)
     for offset, item in enumerate(menu.items(state)):
-        rows[MENU_ITEM_ROW + offset] = _item_row(item, offset == selected,
-                                                 style)
+        rows[MENU_ITEM_ROW + offset] = _item_row(
+            item, offset == selected, style, width)
     return rows
 
 
-def _device_rows(snapshot, state, style):
-    rows = {STATUS_ROW: _device_status(snapshot, style)}
+def _policy_rows(snapshot, state, style, width, auto=None):
+    rows = {STATUS_ROW: _status_row(snapshot, style, width, auto)}
+    banner = _banner_row(snapshot, style, width)
+    if banner is not None:
+        rows[BANNER_ROW] = banner
+    selected = menu.index(snapshot, state)
+    rules = auto.policies if auto is not None else {}
+    rule = rules.get(state.port)
+    if rule is None:
+        rule = policy.Policy()
+    for offset, field in enumerate(menu.POLICY_ROWS):
+        label, value, token = menu.policy_row(rule, field)
+        rows[LIST_ROW + offset] = _pair_row(
+            label, value, token, style, width, selected=offset == selected)
+    rows[AUTO_NOTE_ROW] = (
+        _label_indent(width) + style(menu.AUTO_NOTE, menu.DIM))
+    rows[DEVICE_BACK_ROW] = _item_row(
+        menu.Item(menu.LABEL_BACK, menu.BACK),
+        selected == len(menu.POLICY_ROWS), style, width)
+    return rows
+
+
+def _device_rows(snapshot, state, style, width):
+    rows = {STATUS_ROW: _device_status(snapshot, style, width)}
     for offset, (label, value, known) in enumerate(
             menu.device_fields(snapshot)):
-        rows[LIST_ROW + offset] = _field_row(label, value, known, style)
+        rows[LIST_ROW + offset] = _field_row(label, value, known,
+                                              style, width)
     entries = menu.items(state)
-    rows[DEVICE_BACK_ROW] = _item_row(entries[0], True, style)
+    rows[DEVICE_BACK_ROW] = _item_row(entries[0], True, style, width)
     return rows
 
 
-def _help_rows(snapshot, state, style):
-    rows = {STATUS_ROW: _device_status(snapshot, style)}
-    rows[LIST_ROW] = (_indent(LABEL_COL)
+def _help_rows(snapshot, state, style, width):
+    rows = {STATUS_ROW: _device_status(snapshot, style, width)}
+    rows[LIST_ROW] = (_label_indent(width)
                       + style(HELP_TITLE, menu.TEXT, bold=True))
-    rows[LIST_ROW + 1] = (_indent(LABEL_COL)
+    rows[LIST_ROW + 1] = (_label_indent(width)
                           + style(HELP_SUBTITLE, menu.DIM))
     for offset, (key, text) in enumerate(HELP_KEYS):
         rows[LIST_ROW + 3 + offset] = (
-            _indent(LABEL_COL)
+            _label_indent(width)
             + style(pad(key, HELP_KEY_WIDTH), menu.TEXT, bold=True)
             + style(text, menu.DIM))
-    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style)
+    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style, width)
     return rows
 
 
-def _detail_row(label, value, token, style):
-    return (_indent(LABEL_COL)
-            + style(pad(label, DEVICE_VALUE_COL - LABEL_COL), menu.TEXT,
-                    bold=True)
-            + style(value, token))
-
-
-def _port_detail_rows(snapshot, state, style, usb):
+def _port_detail_rows(snapshot, state, style, usb, width):
     values = menu.readout(snapshot, state.port)
     power_token = menu.OK if values.power_on else menu.DIM
     data_token = menu.OK if values.data_on else menu.DIM
     voltage_token = menu.TEXT if values.voltage_live else menu.DIM
     current_token = menu.TEXT if values.current_live else menu.DIM
-    rows = {STATUS_ROW: _device_status(snapshot, style)}
+    rows = {STATUS_ROW: _device_status(snapshot, style, width)}
     fields = (
         ("power", values.power_text, power_token),
         ("data", values.data_word, data_token),
@@ -388,46 +485,43 @@ def _port_detail_rows(snapshot, state, style, usb):
         ("current", values.current_text, current_token),
     )
     for offset, (label, value, token) in enumerate(fields):
-        rows[LIST_ROW + offset] = _detail_row(label, value, token, style)
+        rows[LIST_ROW + offset] = _pair_row(label, value, token, style, width)
     if usb is not None:
-        rows[LIST_ROW + 4] = _detail_row("usb", f"{usb.vid}:{usb.pid}",
-                                         menu.TEXT, style)
-        rows[LIST_ROW + 5] = _detail_row("product", usb.product or "?",
-                                         menu.TEXT, style)
+        rows[LIST_ROW + 4] = _pair_row("usb", f"{usb.vid}:{usb.pid}",
+                                       menu.TEXT, style, width)
+        rows[LIST_ROW + 5] = _pair_row("product", usb.product or "?",
+                                       menu.TEXT, style, width)
     else:
         reason = "data off" if values.data_word != "on" else "no device"
-        rows[LIST_ROW + 4] = _detail_row("usb", reason, menu.DIM, style)
-    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style)
+        rows[LIST_ROW + 4] = _pair_row("usb", reason, menu.DIM, style, width)
+    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style, width)
     return rows
 
 
-def _settings_rows(snapshot, state, style):
-    rows = {STATUS_ROW: _device_status(snapshot, style)}
+def _settings_rows(snapshot, state, style, width):
+    rows = {STATUS_ROW: _device_status(snapshot, style, width)}
     selected = menu.index(snapshot, state)
     for offset, (label, value) in enumerate(menu.settings_rows(snapshot)):
-        text = (style(pad(label, DEVICE_VALUE_COL - LABEL_COL), menu.TEXT,
-                      bold=True)
-                + style(value, menu.TEXT))
-        if offset == selected:
-            text = style(pad(label, DEVICE_VALUE_COL - LABEL_COL) + value,
-                         bold=True, rev=True)
-        rows[LIST_ROW + offset] = _indent(LABEL_COL) + text
-    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style)
+        rows[LIST_ROW + offset] = _pair_row(
+            label, value, menu.TEXT, style, width, selected=offset == selected)
+    rows[DEVICE_BACK_ROW] = _item_row(menu.items(state)[0], True, style, width)
     return rows
 
 
-def _screen_rows(snapshot, state, style, usb=None):
+def _screen_rows(snapshot, state, style, width, usb=None, auto=None):
     if state.screen == menu.MENU:
-        return _menu_rows(snapshot, state, style)
+        return _menu_rows(snapshot, state, style, width, auto)
     if state.screen == menu.DEVICE:
-        return _device_rows(snapshot, state, style)
+        return _device_rows(snapshot, state, style, width)
     if state.screen == menu.HELP:
-        return _help_rows(snapshot, state, style)
+        return _help_rows(snapshot, state, style, width)
     if state.screen == menu.PORT:
-        return _port_detail_rows(snapshot, state, style, usb)
+        return _port_detail_rows(snapshot, state, style, usb, width)
     if state.screen == menu.SETTINGS:
-        return _settings_rows(snapshot, state, style)
-    return _control_rows(snapshot, state, style)
+        return _settings_rows(snapshot, state, style, width)
+    if state.screen == menu.POLICY:
+        return _policy_rows(snapshot, state, style, width, auto)
+    return _control_rows(snapshot, state, style, width, auto)
 
 
 def _heading(snapshot, state):
@@ -437,6 +531,8 @@ def _heading(snapshot, state):
         return TITLE_SETTINGS
     if state.screen == menu.HELP:
         return TITLE_HELP
+    if state.screen == menu.POLICY:
+        return f"{menu.AUTO_TITLE} - {menu.port_label(max(1, state.port))}"
     if state.screen == menu.PORT:
         values = menu.readout(snapshot, state.port)
         title = f"HUBCTL  {menu.port_label(state.port)} - {values.power_text}"
@@ -449,6 +545,8 @@ def _heading(snapshot, state):
 def _footer_text(snapshot, state):
     if state.screen == menu.SETTINGS:
         return FOOTER_SETTINGS
+    if state.screen == menu.POLICY:
+        return FOOTER_POLICY
     if state.screen in (menu.PORT, menu.DEVICE, menu.HELP):
         return FOOTER_DEVICE
     if state.screen == menu.MENU:
@@ -461,7 +559,7 @@ def _footer_text(snapshot, state):
 
 
 def render(snapshot: Snapshot, state: menu.State, width: int, height: int,
-           color: bool = True, utf8: bool = True, usb=None):
+           color: bool = True, utf8: bool = True, usb=None, auto=None):
     """Return exactly ``height`` lines of exactly ``width`` visible columns."""
     style = Style(color)
     glyph = "\u2502" if utf8 else "|"
@@ -471,9 +569,9 @@ def render(snapshot: Snapshot, state: menu.State, width: int, height: int,
     lines = [_header(_heading(snapshot, state), badge, token,
                      width, style, glyph)]
     if height >= 2:
-        rows = _screen_rows(snapshot, state, style, usb)
+        rows = _screen_rows(snapshot, state, style, width, usb, auto)
         if snapshot.identity is not None:
-            rows[height - LAST_ROW_FROM_END] = _last_row(snapshot, style)
+            rows[height - LAST_ROW_FROM_END] = _last_row(snapshot, style, width)
         body = [rows.get(row, "") for row in range(2, height)]
         lines.extend(_body(content, width, style, glyph) for content in body)
         lines.append(_footer(_footer_text(snapshot, state), width, style,

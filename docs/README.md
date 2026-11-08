@@ -32,9 +32,10 @@ log.
 | — | `scripts/lab_verify.py --map` | Maps current downstream devices to channels without CMD |
 | — | `scripts/lab_verify.py --allow-switch --find-device` | Identifies the channel that enumerates a new downstream device |
 | ARCH-001 | [Control-app architecture](./architecture/overview.md) | Implemented — layer, module, and contract view |
+| ARCH-002 | [Automatic port control](./architecture/policy.md) | Implemented |
 | — | [Architecture review page](./architecture/overview.html) | Implemented — visual companion |
 | UI-MENU-002 | [Control-page spec](./ui/menu.md) | Implemented — matches `src/hubctl` |
-| — | [UI mockup](./ui/mockup/index.html) | Approved — static ANSI rendering, eight states |
+| — | [UI mockup](./ui/mockup/index.html) | Approved — sixteen frames, all implemented |
 | IF-PROTO-001 | [Wire protocol contract](./contracts/protocols.md) | Implemented |
 | T-PLAN-001 | [Test plan and results](./testing/TEST_PLAN.md) | Host suite passes; switching pending |
 | OPS-BUILD-001 | [Build and run](./operations/build.md) | Implemented |
@@ -48,7 +49,8 @@ port: identity, mode, per-port power/data/voltage/current, a read-only detail
 page per port with the downstream USB identity when data is on, a Settings
 page for the endpoint and poll period, and guarded
 VBUS/D+/D- switching on the selected port. `m` opens a global menu with
-`Device`, `Settings` and `Help`. The host suite, the pty app test, the
+`Device`, `Auto`, `Settings` and `Help`. Automatic control is per port and
+session-only. The host suite, the pty app test, the
 refactored lab-tool self-test, and a read-only on-target run pass. Real VBUS
 switching by the app is not yet run.
 

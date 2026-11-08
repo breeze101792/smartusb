@@ -7,7 +7,7 @@ the visual truth.
 | ID | Document | Purpose | Status |
 | --- | --- | --- | --- |
 | UI-MENU-002 | [menu.md](./menu.md) | Page spec: frame, menu, Device, states, keys, tokens | Implemented |
-| — | [mockup/index.html](./mockup/index.html) | Reference rendering of the thirteen frames | Approved |
+| — | [mockup/index.html](./mockup/index.html) | Reference rendering of the sixteen frames | Approved |
 | — | [Software architecture](../architecture/overview.html) | Layer and module view | Implemented |
 
 ## What shapes the screen

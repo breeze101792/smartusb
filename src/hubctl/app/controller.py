@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 from ..constants import (
+    AUTO_MANUAL_HOLD_S,
+    AUTO_MAX_POLL_S,
     FAILURE_LIMIT,
     LINK_DEADLINE_S,
     POLL_CHOICES_S,
@@ -16,6 +19,7 @@ from ..constants import (
     STALE_AFTER_POLLS,
     WRITE_SETTLE_S,
 )
+from ..hal import usbmap
 from ..hal.base import (
     ChannelReading,
     DeviceDriver,
@@ -32,6 +36,8 @@ from ..hal.base import (
 )
 from ..hal.discovery import candidate_ports
 from ..hal.registry import open_first
+from . import policy
+from .policy import Auto, Policy, PortAuto
 
 
 def _same_identity(left: Identity, right: Identity) -> bool:
@@ -61,7 +67,7 @@ class Controller:
 
     def __init__(self, open_fn=None, poll_interval: float = POLL_INTERVAL_S,
                  clock=time.monotonic, sleep=time.sleep,
-                 port: str | None = None, trace=None):
+                 port: str | None = None, trace=None, wall=time.time):
         self._port = port
         self._trace = trace
         self._open_fn = open_fn or (
@@ -70,6 +76,7 @@ class Controller:
         self._port_choices: tuple[str, ...] = ()
         self._choices_at: float | None = None
         self._clock = clock
+        self._wall = wall
         self._sleep = sleep
 
         self._driver: DeviceDriver | None = None
@@ -91,6 +98,13 @@ class Controller:
         self._next_cycle = 0.0
         self._pending: dict[int, ChannelReading] = {}
         self._failures = 0
+
+        # ARCH-002 automation. In memory only; nothing is written on exit.
+        self._auto = policy.empty()
+        self._poll_count = 0
+        self._manual_poll: int | None = None
+        self._observed: dict[int, bool | None] = {}
+        self._wrote: dict[int, bool] = {}
 
     # --- lifecycle --------------------------------------------------------
     def close(self):
@@ -127,6 +141,9 @@ class Controller:
         self._backoff = 0
         self._next_open = self._clock()
         self._choices_at = None
+        self._observed = {}
+        self._wrote = {}
+        self._auto = policy.reset(self._auto)
         self._note(f"port set to {port or 'auto'}", "ok")
 
     def set_poll(self, seconds: float):
@@ -135,7 +152,41 @@ class Controller:
         if seconds == self._poll:
             return
         self._poll = seconds
+        for state in self._auto.state.values():
+            state.pending_on_at = None
+            state.pending_text = None
         self._note(f"poll set to {seconds:.1f} s", "ok")
+
+    # --- automation -------------------------------------------------------
+    def auto(self) -> Auto:
+        """A copy of the automation state, for rendering."""
+        return Auto(paused=self._auto.paused,
+                    policies=dict(self._auto.policies),
+                    state={port: replace(item)
+                           for port, item in self._auto.state.items()})
+
+    def set_policy(self, port: int, policy: Policy):
+        """Store one port's rules. A change of ``enabled`` re-arms the port."""
+        previous = self._auto.policies.get(port)
+        self._auto.policies[port] = policy
+        if previous is None:
+            self._auto.state.setdefault(port, PortAuto())
+        elif previous.enabled != policy.enabled:
+            self._auto.state[port] = PortAuto()
+        if not policy.enabled:
+            state = self._auto.state.get(port)
+            if state is not None:
+                state.pending_on_at = None
+                state.pending_text = None
+                state.low_since = None
+
+    def set_auto_paused(self, paused: bool):
+        """Pause or resume automation. Pausing cancels the deferred work."""
+        if paused == self._auto.paused:
+            return
+        self._auto.paused = paused
+        if paused:
+            self._cancel_auto()
 
     def request_refresh(self):
         """Poll now. Also retries a lost link immediately."""
@@ -144,6 +195,13 @@ class Controller:
         self._next_cycle = self._clock()
         if self._driver is None:
             self._next_open = self._clock()
+
+    def _restart_cycle(self):
+        """Drop the in-flight poll so a stale reading cannot clobber a write."""
+        self._cycle = []
+        self._pending = {}
+        self._failures = 0
+        self._next_cycle = self._clock()
 
     def tick(self, now: float) -> bool:
         """Perform at most one device request. True when the snapshot changed."""
@@ -207,6 +265,7 @@ class Controller:
 
     def _try_open(self, now: float) -> bool:
         driver = None
+        reconnecting = self._identity is not None
         try:
             driver = self._open_fn()
             identity = driver.identity()
@@ -235,6 +294,10 @@ class Controller:
             self._next_open = 0.0
             self._backoff = 0
             self._last_error = None
+            self._observed = {}
+            self._wrote = {}
+            if reconnecting:
+                self._auto = policy.reset(self._auto)
             self._note(f"connected {identity.product} on {identity.port}", "ok")
             return True
         except DeviceError as exc:
@@ -260,6 +323,7 @@ class Controller:
         self._failures = 0
         self._last_error = reason
         self._note(reason, "err")
+        self._cancel_auto()
         self._schedule_open(self._clock())
 
     # --- polling ----------------------------------------------------------
@@ -337,6 +401,10 @@ class Controller:
         self._next_cycle = self._cycle_started + self._poll
         if self._next_cycle < now:
             self._next_cycle = now
+        self._poll_count += 1
+        self._note_external(now)
+        if self._poll <= AUTO_MAX_POLL_S:
+            self._evaluate()
 
     def _refresh_link(self, now: float) -> bool:
         if self._last_cycle is None:
@@ -351,15 +419,91 @@ class Controller:
                 self._mark_lost("link deadline exceeded")
                 return True
         changed = link != self._link
+        if changed and link != LinkState.LIVE:
+            self._cancel_auto()
         self._link = link
         return changed
+
+    # --- automation -------------------------------------------------------
+    def _evaluate(self):
+        """Run the rules once, after a completed poll, and write at most once."""
+        now = self._clock()
+        snapshot = self.snapshot()
+        watched = [port for port, rule in self._auto.policies.items()
+                   if rule.enabled and rule.recovery_s is not None]
+        usb_present = usbmap.port_devices(watched)
+        self._auto, decision = policy.decide(
+            snapshot, self._auto, usb_present, now, self._wall())
+        if decision is not None:
+            self.set_power(decision.port, decision.on, decision.text,
+                           auto=True)
+
+    def _cancel_auto(self):
+        """Let a closed gate cancel the deferred work, not postpone it."""
+        now = self._clock()
+        self._auto, _decision = policy.decide(
+            self.snapshot(), self._auto, {}, now, self._wall())
+
+    def _note_external(self, now: float):
+        """A power state this app did not command is a press on the unit."""
+        for port, reading in self._channels.items():
+            previous = self._observed.get(port)
+            if (port in self._auto.policies
+                    and previous is not None
+                    and reading.power is not None
+                    and reading.power != previous
+                    and not self._wrote.get(port)):
+                state = self._auto.state.setdefault(port, PortAuto())
+                state.manual_until = now + AUTO_MANUAL_HOLD_S
+                state.pending_on_at = None
+                state.pending_text = None
+            self._observed[port] = reading.power
+            self._wrote[port] = False
 
     # --- control ----------------------------------------------------------
     def _note(self, text: str, kind: str):
         self._last_action = text
         self._last_kind = kind
 
+    def _note_result(self, text: str, kind: str, auto: bool):
+        """A manual result keeps the line for one completed poll."""
+        if (auto and self._manual_poll is not None
+                and self._poll_count <= self._manual_poll + 1):
+            return
+        self._note(text, kind)
+        if not auto:
+            self._manual_poll = self._poll_count
+
+    def _hold(self, channel: int):
+        """A key press wins every rule but the safe cut, for five seconds."""
+        state = self._auto.state.setdefault(channel, PortAuto())
+        state.manual_until = self._clock() + AUTO_MANUAL_HOLD_S
+        state.pending_on_at = None
+        state.pending_text = None
+
+    def set_power(self, port: int, on: bool, reason: str, auto: bool = False):
+        """Write a target state, never a toggle (ARCH-002).
+
+        The same guards as a key press, then the echo and readback path. When
+        the target already matches the observed state nothing is written.
+        """
+        snapshot = self.snapshot()
+        if self._driver is None or snapshot.link != LinkState.LIVE:
+            self._note("link is not live - no write", "warn")
+            return
+        if self._status.mode != Mode.NORMAL:
+            self._note("interlock mode - switching disabled", "warn")
+            return
+        current = self._channels.get(port)
+        if current is None or current.power is None:
+            self._note(f"{_usb(port)} power state unknown - no write", "warn")
+            return
+        if current.power == on:
+            return
+        self._write_power(port, on, reason, auto)
+
     def toggle_power(self, channel: int):
+        self._hold(channel)
         snapshot = self.snapshot()
         if self._driver is None or snapshot.link != LinkState.LIVE:
             self._note("link is not live - no write", "warn")
@@ -372,7 +516,10 @@ class Controller:
             self._note(
                 f"{_usb(channel)} power state unknown - no write", "warn")
             return
-        target = not current.power
+        self._write_power(channel, not current.power, None, False)
+
+    def _write_power(self, channel: int, target: bool, reason: str | None,
+                     auto: bool):
         verb = "on" if target else "off"
         failure = _link_lost(channel, verb)
         driver = self._driver
@@ -390,6 +537,8 @@ class Controller:
             self._mark_lost(failure)
             return
 
+        self._wrote[channel] = True
+        self._restart_cycle()
         self._sleep(WRITE_SETTLE_S)
         power = self._read_back(lambda: driver.read_power([channel]), channel,
                                 failure)
@@ -411,14 +560,17 @@ class Controller:
             current_ma=stored.current_ma,
         )
         if power != target:
-            self._note(
+            self._note_result(
                 f"{_usb(channel)} {verb} - state differs "
-                f"(0x00 {'on' if power else 'off'})", "warn")
+                f"(0x00 {'on' if power else 'off'})", "warn", auto)
+        elif reason is not None:
+            self._note_result(reason, "ok", auto)
         else:
             data_text = "?" if raw_data is None else ("on" if raw_data else "off")
-            self._note(
+            self._note_result(
                 f"{_usb(channel)} {verb} - echo ok, "
-                f"0x00 {'on' if power else 'off'}, 0x08 {data_text}", "ok")
+                f"0x00 {'on' if power else 'off'}, 0x08 {data_text}", "ok",
+                auto)
 
     def toggle_data(self, channel: int):
         snapshot = self.snapshot()
@@ -452,6 +604,7 @@ class Controller:
             self._mark_lost(failure)
             return
 
+        self._restart_cycle()
         self._sleep(WRITE_SETTLE_S)
         data = self._read_back(lambda: driver.read_data([channel]), channel,
                                failure)
@@ -469,13 +622,13 @@ class Controller:
             current_ma=stored.current_ma,
         )
         if data != target:
-            self._note(
+            self._note_result(
                 f"{_usb(channel)} data {verb} - state differs "
-                f"(0x08 {'on' if data else 'off'})", "warn")
+                f"(0x08 {'on' if data else 'off'})", "warn", False)
         else:
-            self._note(
+            self._note_result(
                 f"{_usb(channel)} data {verb} - echo ok, "
-                f"0x08 {'on' if data else 'off'}", "ok")
+                f"0x08 {'on' if data else 'off'}", "ok", False)
 
     def _read_back(self, read, channel: int, failure: str):
         for attempt in range(2):

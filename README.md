@@ -9,12 +9,15 @@ Python standard library only. Linux and macOS. The vendor SDK under
 ## What it does
 
 - Finds the CMD port by `1a86:fe0c`; it never opens the DATA hub `1a86:8091`.
-- Shows identity, mode, and per-port power, D+/D-, voltage and current on one
-  control page, one row per port.
+- Shows identity, mode, and per-port power, D+/D-, voltage, current and watts
+  on one control page, one row per port.
 - Switches VBUS and D+/D- on the selected port, then reads both states back.
 - Opens a global menu with `m`; it holds `Device`, `Settings` and `Help`.
 - On a port detail page, shows the downstream USB device (VID:PID and product)
   when D+/D- is on and the device is visible on this host.
+- Automatic control per port: power-cycle on a timer, overcurrent cut with a
+  capped retry, recovery when the device leaves the bus, and a daily schedule.
+  Off by default; `a` opens the selected port's policy, `p` pauses all rules.
 - Shows LIVE / STALE / LOST; switching is disabled when the link is stale or the
   unit is in interlock mode.
 - Blocks NVM writes, reset, reboot, factory reset, interlock control and V3
@@ -43,21 +46,27 @@ hubctl
 
 ## Keys
 
-| Key | Control | Port detail | Global menu | Settings | Device | Help |
-| --- | --- | --- | --- | --- | --- | --- |
-| `j` / `Down` | next port | - | next item | next setting | - | - |
-| `k` / `Up` | previous port | - | previous item | previous setting | - | - |
-| `Left` / `Right` | - | - | - | change the value | - | - |
-| `Enter` | open the port detail | back | open the item | back | back | back |
-| `Space` | toggle VBUS on the selected port | - | - | - | - | - |
-| `d` | toggle D+/D- (only while powered) | - | - | - | - | - |
-| `m` | open the menu | back to control | close | back to control | back to control | back to control |
-| `r` | poll now; retry a lost link | poll now | poll now | poll now | poll now | poll now |
-| `q` / `Esc` | quit | back | close | back | back | back |
-| `Ctrl-C` | quit and restore the terminal | quit | quit | quit | quit | quit |
+| Key | Control | Port detail | Port policy | Global menu | Settings | Device | Help |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `j` / `Down` | next port | - | next row | next item | next setting | - | - |
+| `k` / `Up` | previous port | - | previous row | previous item | previous setting | - | - |
+| `Left` / `Right` | - | - | change the value | - | change the value | - | - |
+| `Enter` | open the port detail | back | back | open the item | back | back | back |
+| `a` | open the selected port's policy | - | - | - | - | - | - |
+| `p` | pause automation | - | pause automation | - | - | - | - |
+| `Space` | toggle VBUS on the selected port | - | - | - | - | - | - | - |
+| `d` | toggle D+/D- (only while powered) | - | - | - | - | - | - | - |
+| `m` | open the menu | back to control | back to control | back to control | close | back to control | back to control | back to control |
+| `r` | poll now; retry a lost link | poll now | poll now | poll now | poll now | poll now | poll now | poll now |
+| `q` / `Esc` | quit | back | back | back to the list | close | back | back | back |
+| `Ctrl-C` | quit and restore the terminal | quit | quit | quit | quit | quit | quit | quit |
 
 `Space` and `d` are refused unless the link is LIVE, the mode is normal, and for
 `d` the port is powered. The reason appears on the `last` line.
+
+Automatic control writes only while the link is LIVE in normal mode, one write
+per poll, and a manual `Space` wins for 5 s. Rules are session-only: they clear
+when `hubctl` exits. The overcurrent cut reads `0x04`, which is not metrology.
 
 Enter never switches. Terminal autorepeat can repeat a held Enter, so the only
 write keys are `Space` and `d`, and the 0.4 s guard is per key. Enter opens the

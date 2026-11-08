@@ -43,6 +43,14 @@ def hub_paths(root: str = ROOT) -> list[str]:
     return sorted(found)
 
 
+def port_devices(ports, root: str = ROOT) -> dict[int, bool]:
+    """Which downstream ports have a device, with one scan of the hubs."""
+    hubs = hub_paths(root)
+    return {port: any(_read(os.path.join(root, f"{hub}.{port}", "idVendor"))
+                      is not None for hub in hubs)
+            for port in ports}
+
+
 def port_device(port: int, root: str = ROOT) -> UsbDevice | None:
     """The device plugged into downstream port ``port``, if this host sees it."""
     for hub in hub_paths(root):

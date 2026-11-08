@@ -29,39 +29,54 @@ POLL_CHOICES_S = (0.5, 1.0, 2.0, 5.0)
 PORT_CHOICES_TTL_S = 2.0
 USB_REFRESH_S = 1.0
 
+# Automatic port control, docs/architecture/policy.md section 6.
+AUTO_MIN_CYCLE_S = 60
+AUTO_CYCLE_OFF_S = 2
+AUTO_MANUAL_HOLD_S = 5
+AUTO_MAX_RETRIES = 3
+AUTO_OVER_SAMPLES = 2
+AUTO_NORMAL_SAMPLES = 3
+AUTO_MAX_POLL_S = 1.0
+AUTO_WALL_JUMP_S = 60.0
+# Window used when the schedule is first switched on.
+AUTO_SCHEDULE_DEFAULT = (8 * 60, 18 * 60)
+
 # Screen.
 MIN_WIDTH = 60
 MIN_HEIGHT = 16
 
 # Menu frame. Rows and columns are 1-based; the offsets count from the far edge.
-RAIL_LEFT_COL = 4
-RAIL_RIGHT_FROM_END = 4
-BAR_LEFT_COL = 5
-BAR_RIGHT_FROM_END = 5
+RAIL_LEFT_COL = 1
+RAIL_RIGHT_FROM_END = 0
+BAR_LEFT_COL = 2
+BAR_RIGHT_FROM_END = 1
 
 STATUS_ROW = 3
-STATUS_COL = 8
+STATUS_COL = 5
 BANNER_ROW = 4
 LIST_ROW = 5
 MENU_ITEM_ROW = 6
 LAST_ROW_FROM_END = 1
-LAST_LABEL_COL = 8
-LAST_TEXT_COL = 16
+LAST_LABEL_COL = 5
+LAST_TEXT_COL = 13
 
-# Item and field cells: label 8/12, power 20/4, data 24/8, voltage 34/9, current 45/7.
-LABEL_COL = 8
+# Item and field cells: label 5/12, power 17/4, data 21/8, voltage 31/9, current 42/7, W 51/6.
+LABEL_COL = 5
 LABEL_WIDTH = 12
-POWER_COL = 20
+POWER_COL = 17
 POWER_WIDTH = 4
-DATA_COL = 24
+DATA_COL = 21
 DATA_WIDTH = 8
-VOLTAGE_COL = 34
+VOLTAGE_COL = 31
 VOLTAGE_WIDTH = 9
-CURRENT_COL = 45
+CURRENT_COL = 42
 CURRENT_WIDTH = 7
+WATT_COL = 51
+WATT_WIDTH = 6
 
-DEVICE_VALUE_COL = 20
+DEVICE_VALUE_COL = 17
 DEVICE_BACK_ROW = 13
+AUTO_NOTE_ROW = 14
 
 # Device identity.
 VID = "1a86"

@@ -37,7 +37,7 @@ TUI (raw ANSI)  ->  Controller  ->  DeviceDriver (HAL)  ->  4CH driver  ->  code
 
 | Layer | Files | Responsibility | Must not |
 | --- | --- | --- | --- |
-| CLI / TUI | `cli.py`, `app/tui.py`, `app/menu.py`, `app/view.py`, `app/term.py` | arguments, terminal lifecycle, keys, menu state, pure ANSI rendering | speak protocol, open a port |
+| CLI / TUI | `cli.py`, `app/tui.py`, `app/menu.py`, `app/view.py`, `app/term.py`, `app/policy.py` | arguments, terminal lifecycle, keys, menu and policy state, pure ANSI rendering | speak protocol, open a port |
 | Controller | `app/controller.py` | tick schedule, poll cycle, write verification, staleness, reconnect | format text, build frames |
 | HAL | `hal/base.py`, `hal/registry.py` | types, `DeviceDriver` ABC, error taxonomy, driver list | know termios or ANSI |
 | Discovery | `hal/discovery.py` | enumerate candidate endpoints per platform | open or write a port |
@@ -47,11 +47,12 @@ TUI (raw ANSI)  ->  Controller  ->  DeviceDriver (HAL)  ->  4CH driver  ->  code
 Dependency direction is acyclic:
 
 ```
-cli -> tui -> controller -> hal.base
-          tui -> menu -> hal.base (types only)
-          tui -> view -> menu, hal.base (types only)
+cli -> tui -> controller -> policy -> hal.base
+          tui -> menu -> policy, hal.base (types only)
+          tui -> view -> menu, policy, hal.base (types only)
           tui -> term
        controller -> hal.registry -> driver -> protocol + transport
+       controller -> hal.usbmap (downstream identity)
 ```
 
 ## 3. Module boundaries
@@ -64,9 +65,10 @@ cli -> tui -> controller -> hal.base
 | `devices/smartusbhub/protocol.py` | frame encoding and parsing | `encode_v1`, `encode_v2`, `encode_v3`, `next_frame`, `crc16` | nothing |
 | `devices/smartusbhub/transport.py` | fd, exclusive lock, allow-list | `SerialLink(port)`, `request`, `write`, `close` | `protocol`, stdlib |
 | `devices/smartusbhub/driver.py` | device semantics and state | `DeviceDriver` methods | `hal.base`, `protocol`, `transport` |
-| `app/controller.py` | session state and policy | `Controller` methods, `snapshot()` | `hal.base`, `hal.registry` |
+| `app/controller.py` | session state, writes, automatic control | `Controller` methods, `snapshot()`, `set_power()`, `auto()` | `hal.base`, `hal.registry`, `hal.usbmap`, `policy` |
+| `app/policy.py` | automatic-control rules and timers | `Policy`, `Auto`, `Decision`, `decide()`, `step()` | `hal.base` types, constants |
 | `app/menu.py` | page and menu state, item lists, key routing | `State`, `Action`, `items()`, `index()`, `handle_key()`, `readout()`, `device_fields()` | `hal.base` types |
-| `app/view.py` | ANSI text layout | `render(snapshot, state, width, height) -> list[str]` | `menu`, `hal.base` types |
+| `app/view.py` | ANSI text layout | `render(snapshot, state, width, height, usb=None, auto=None) -> list[str]` | `menu`, `policy`, `hal.base` types |
 | `app/term.py` | raw mode, alternate screen, size, key decode, frame write | `Terminal`, `read_key()`, `draw()` | stdlib |
 | `app/tui.py` | loop and input handling | `run(controller)` | `term`, `view`, `menu`, `controller` |
 | `cli.py` | arguments, exit codes | `main(argv) -> int` | everything above |
@@ -230,6 +232,11 @@ thread, deferred until it is measured as a problem.
 | INV-009 | One process owns the port | exclusive non-blocking `flock` on the fd |
 | INV-010 | The terminal is restored on every exit path | raw-mode enter/leave in `finally`, plus SIGTERM/SIGHUP |
 | INV-011 | The app never binds a reply by command byte alone | framing plus per-command decode; unsolicited `0x00` is drained and treated as truth |
+| INV-012 | Automated writes only while the link is LIVE in normal mode | policy gates |
+| INV-013 | A manual VBUS change suppresses automation for 5 s; a safe cut is exempt | controller hold |
+| INV-014 | One automated write per poll through `set_power` with readback | controller |
+| INV-015 | No policy is persisted; exiting performs no write | session state |
+| INV-016 | The cut uses `0x04`; `0x1B`/`0x1C` stay out of the allow-list | transport |
 
 ## 8. Discovery and reconnect
 
@@ -272,10 +279,11 @@ downstream sysfs device map, non-interactive CLI output, mouse.
 | --- | --- | --- |
 | Codec matches documented and captured frames | vector tests, bad checksum resync, truncation | host — 8 pass |
 | Driver: identity, masks, reads, writes, rejection, silence, allow-list | pty fake device | host — 10 pass |
-| Controller: poll schedule, write verify, staleness, reconnect, result strings, port and poll settings | fake driver, injectable clock | host — 23 pass |
-| Menu model: port list, port detail, global menu, Settings, Enter never writes, key routing | pure `menu` assertions | host — 32 pass |
-| Render: frame, states, width/height sweep, clipping, selection without colour, thirteen mockup frames | pure `render()` assertions | host — 35 pass |
-| TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, usb map read only with data on, every screen redrawn, per-key repeat guard | fake controller, terminal and clock | host — 21 pass |
+| Controller: poll schedule, write verify, staleness, reconnect, settings, `set_power`, automatic writes | fake driver, injectable clock | host — 41 pass |
+| Menu model: port list, port detail, global menu, Settings and policy, key routing | pure `menu` assertions | host — 39 pass |
+| Render: frame, states, width/height sweep, clipping, selection, sixteen mockup frames | pure `render()` assertions | host — 46 pass |
+| Automatic control: rules, priority, gates, timers, retry cap, schedule | pure `decide()` truth tables | host — 54 pass |
+| TUI loop: screens, `a`/`p`, policy stepping, usb map, per-key repeat guard | fake controller, terminal and clock | host — 25 pass |
 | Discovery filters `fe0c` and rejects `8091` | fake sysfs tree | host — 2 pass |
 | Key decode: arrows, lone Esc, unknown sequences ignored, plain keys | raw pipe fd | host — 4 pass |
 | Downstream USB map: hub discovery, port child, empty port, missing tree | fake sysfs tree | host — 4 pass |

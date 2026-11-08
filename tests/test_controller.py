@@ -1,7 +1,14 @@
+import time
 import unittest
 
+from hubctl.app import policy
 from hubctl.app.controller import Controller
-from hubctl.constants import POLL_MAX_S, POLL_MIN_S
+from hubctl.constants import (
+    AUTO_MANUAL_HOLD_S,
+    POLL_MAX_S,
+    POLL_MIN_S,
+    WRITE_SETTLE_S,
+)
 from hubctl.hal.base import (
     DeviceDriver,
     Identity,
@@ -362,6 +369,224 @@ class ResultStringTests(unittest.TestCase):
         self.controller.toggle_data(2)
         self.assertEqual(self.note(),
                          "USB2 data needs power - key ignored")
+
+
+class AutoControllerTests(unittest.TestCase):
+    """ARCH-002: the controller owns the state and does the one write."""
+
+    WINDOW = (8 * 60, 18 * 60)
+
+    def setUp(self):
+        self.clock = Clock()
+        self.driver = FakeDriver()
+        self.controller = Controller(
+            open_fn=lambda: self.driver,
+            clock=self.clock,
+            sleep=self.clock.sleep,
+            wall=lambda: at(9))
+
+    def tearDown(self):
+        self.controller.close()
+
+    def poll(self, limit=60):
+        """Run ticks until one poll completes."""
+        before = self.controller._poll_count
+        for _ in range(limit):
+            self.clock.advance(0.05)
+            self.controller.tick(self.clock())
+            if self.controller._poll_count != before:
+                return
+        self.fail("no completed poll")
+
+    def enable(self, port, **fields):
+        self.controller.set_policy(port, policy.Policy(enabled=True, **fields))
+        self.poll()
+
+    def note(self):
+        return self.controller.snapshot().last_action
+
+    def test_set_power_writes_the_target_not_the_toggle(self):
+        self.poll()
+        self.controller.set_power(1, True, "USB1 on - auto schedule 08:00")
+        self.controller.set_power(1, False, "USB1 off - auto schedule 18:00")
+        self.assertEqual(self.driver.set_power_calls,
+                         [((1,), True), ((1,), False)])
+
+    def test_set_power_writes_nothing_when_the_target_matches(self):
+        self.poll()
+        before = self.note()
+        self.controller.set_power(1, False, "USB1 off - auto schedule 18:00")
+        self.assertEqual(self.driver.set_power_calls, [])
+        self.assertEqual(self.note(), before)
+
+    def test_one_automated_write_per_poll(self):
+        for port in (1, 2):
+            self.controller.set_policy(
+                port, policy.Policy(enabled=True, schedule=self.WINDOW))
+        self.poll()
+        self.assertEqual(self.driver.set_power_calls, [((1,), True)])
+        self.poll()
+        self.assertEqual(self.driver.set_power_calls,
+                         [((1,), True), ((2,), True)])
+
+    def test_a_write_restarts_the_poll_cycle(self):
+        self.poll()
+        self.controller.request_refresh()
+        for _ in range(3):
+            self.clock.advance(0.05)
+            self.controller.tick(self.clock())
+        self.assertTrue(self.controller._pending)
+        self.controller.toggle_power(1)
+        self.assertEqual(self.controller._pending, {})
+        self.assertEqual(self.controller._cycle, [])
+
+        self.poll()
+        self.assertEqual(self.controller.snapshot().channels[1].power, True)
+
+    def test_an_automated_result_names_the_rule(self):
+        self.enable(1, schedule=self.WINDOW)
+        self.assertEqual(self.note(), "USB1 on - auto schedule 08:00")
+        self.assertEqual(self.controller.snapshot().last_kind, "ok")
+
+    def test_a_manual_result_survives_one_completed_poll(self):
+        self.poll()
+        self.controller.toggle_power(2)
+        manual = "USB2 on - echo ok, 0x00 on, 0x08 on"
+        self.assertEqual(self.note(), manual)
+
+        for port in (1, 3):
+            self.controller.set_policy(
+                port, policy.Policy(enabled=True, schedule=self.WINDOW))
+        self.poll()
+        self.assertEqual(self.driver.set_power_calls,
+                         [((2,), True), ((1,), True)])
+        self.assertEqual(self.note(), manual)
+
+        self.poll()
+        self.assertEqual(self.driver.set_power_calls,
+                         [((2,), True), ((1,), True), ((3,), True)])
+        self.assertEqual(self.note(), "USB3 on - auto schedule 08:00")
+
+    def test_space_sets_the_hold_and_cancels_the_queued_on(self):
+        self.poll()
+        state = self.controller._auto.state.setdefault(1, policy.PortAuto())
+        state.pending_on_at = self.clock.now + 1
+        state.pending_text = "USB1 on - auto cycle"
+        self.controller.toggle_power(1)
+        state = self.controller.auto().state[1]
+        self.assertIsNone(state.pending_on_at)
+        self.assertEqual(state.manual_until,
+                         self.clock.now - WRITE_SETTLE_S + AUTO_MANUAL_HOLD_S)
+
+    def test_d_does_not_set_the_hold(self):
+        self.poll()
+        self.controller.toggle_data(4)
+        self.assertEqual(self.driver.set_data_calls, [((4,), False)])
+        self.assertNotIn(4, self.controller.auto().state)
+
+    def test_an_external_power_change_sets_the_hold(self):
+        self.enable(1, cycle_s=600)
+        self.driver.power[1] = True
+        self.poll()
+        state = self.controller.auto().state[1]
+        self.assertEqual(state.manual_until,
+                         self.controller._last_cycle + AUTO_MANUAL_HOLD_S)
+        self.assertIsNone(state.pending_on_at)
+
+    def test_an_automated_write_is_not_an_external_change(self):
+        self.poll()
+        self.controller.set_power(1, True, "USB1 on - auto schedule 08:00",
+                                 auto=True)
+        self.poll()
+        state = self.controller.auto().state.get(1)
+        self.assertTrue(state is None or state.manual_until == 0.0)
+
+    def test_set_port_pauses_and_clears_every_timer(self):
+        self.enable(1, cycle_s=600)
+        self.controller._auto.state[1].pending_on_at = 1.0
+        self.controller.set_port("/dev/ttyACM1")
+        automation = self.controller.auto()
+        self.assertTrue(automation.paused)
+        self.assertEqual(automation.state[1], policy.PortAuto())
+
+    def test_a_stale_link_cancels_the_queued_on(self):
+        self.poll()
+        state = self.controller._auto.state.setdefault(1, policy.PortAuto())
+        state.pending_on_at = self.clock.now
+        self.clock.advance(2.5)
+        self.controller.tick(self.clock())
+        self.assertEqual(self.controller.snapshot().link, LinkState.STALE)
+        self.assertIsNone(self.controller.auto().state[1].pending_on_at)
+
+    def test_a_reconnect_pauses_automation(self):
+        self.enable(1, cycle_s=600)
+        self.driver.raise_link = True
+        self.clock.advance(1.1)
+        self.controller.tick(self.clock())
+        self.assertEqual(self.controller.snapshot().link, LinkState.LOST)
+
+        same = FakeDriver(identity())
+        self.controller._open_fn = lambda: same
+        self.clock.advance(2.0)
+        self.controller.tick(self.clock())
+        self.assertEqual(self.controller.snapshot().link, LinkState.STALE)
+        self.assertTrue(self.controller.auto().paused)
+
+    def test_a_long_poll_runs_no_rule(self):
+        controller = Controller(
+            open_fn=lambda: self.driver, clock=self.clock,
+            sleep=self.clock.sleep, wall=lambda: at(9), poll_interval=2.0)
+        controller.set_policy(1, policy.Policy(enabled=True,
+                                               schedule=self.WINDOW))
+        for _ in range(60):
+            self.clock.advance(0.05)
+            controller.tick(self.clock())
+        controller.close()
+        self.assertEqual(self.driver.set_power_calls, [])
+
+    def test_paused_automation_writes_nothing(self):
+        self.controller.set_auto_paused(True)
+        self.controller.set_policy(
+            1, policy.Policy(enabled=True, schedule=self.WINDOW))
+        self.poll()
+        before = self.note()
+        self.assertEqual(self.driver.set_power_calls, [])
+        self.assertEqual(self.note(), before)
+
+        self.controller.set_auto_paused(False)
+        self.poll()
+        self.assertEqual(self.driver.set_power_calls, [((1,), True)])
+
+    def test_a_safe_cut_fires_while_the_hold_is_on(self):
+        self.enable(1, overcurrent_ma=100, retry_s=30)
+        self.driver.power[1] = True
+        self.driver.data[1] = True
+        self.poll()
+        self.assertEqual(self.driver.set_power_calls, [])
+
+        state = self.controller._auto.state[1]
+        self.assertGreater(state.manual_until, self.clock.now)
+        self.poll()
+        self.assertEqual(self.driver.set_power_calls, [((1,), False)])
+        self.assertEqual(self.note(), "USB1 off - auto overcurrent 0.10 A")
+
+    def test_close_performs_no_write(self):
+        self.enable(1, cycle_s=600)
+        self.controller.close()
+        self.assertEqual(self.driver.set_power_calls, [])
+
+    def test_auto_returns_a_copy(self):
+        self.enable(1, cycle_s=600)
+        copy = self.controller.auto()
+        copy.paused = True
+        copy.policies[1] = policy.Policy()
+        self.assertFalse(self.controller.auto().paused)
+        self.assertTrue(self.controller.auto().policies[1].enabled)
+
+
+def at(hour, minute=0):
+    """A local wall time in 2026, away from a DST change."""
+    return time.mktime((2026, 1, 1, hour, minute, 0, 0, 0, -1))
 
 
 if __name__ == "__main__":

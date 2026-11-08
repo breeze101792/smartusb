@@ -26,48 +26,50 @@ live readings. Each port is controlled directly from the list.
 
 | Element | Column | Row |
 | --- | --- | --- |
-| Left rail `│` | 4 | every row |
-| Right rail `│` | `W-4` | every row |
-| Header bar | 5..`W-5` | 1 |
-| Footer bar | 5..`W-5` | `H` |
-| Status line | 8 | 3 |
-| Interlock banner | 8 | 4 |
-| List, first row | 8 | 5 |
-| `last` label | 8 | `H-1` |
-| `last` text | 16 | `H-1` |
+| Left rail `│` | 1 | every row |
+| Right rail `│` | `W` | every row |
+| Header bar | 2..`W-1` | 1 |
+| Footer bar | 2..`W-1` | `H` |
+| Status line | 5 | 3 |
+| Interlock banner | 5 | 4 |
+| List, first row | 5 | 5 |
+| `last` label | 5 | `H-1` |
+| `last` text | 13 | `H-1` |
 
-Header: left title at column 5. Right: the status badge `" " + state + " "`,
-right-aligned so its last character is at `W-6`, with one bar cell at `W-5`
+Header: left title at column 2. Right: the status badge `" " + state + " "`,
+right-aligned so its last character is at `W-2`, with one bar cell at `W-1`
 before the rail. Fill between with the bar.
 
-Port row columns, 1-based, on the control page and the Device page's status
-line:
+Port row columns are responsive. The label sits at column 5 with its 12-column
+cell. The five value cells keep their widths (4, 8, 9, 7, 6) and are spread from
+column 17 to the last usable column with an equal gap, never less than two
+spaces. At 80 columns that puts power at 17, data at 27, voltage at 41, current
+at 57 and watts at 71, with three spaces before the rail. At 60 columns the
+label moves to 4, the gaps compress to two spaces, and two columns stay clear
+before the rail.
 
-| Field | Column | Width |
-| --- | ---: | ---: |
-| label `USB PORT n` | 8 | 12 |
-| power `ON` / `off` / `?` | 20 | 4 |
-| data `data on` / `data off` / `-` / `?` | 24 | 8 |
-| voltage `4.61 V` or `(202 mV)` | 34 | 9 |
-| current `0.00 A` | 45 | 7 |
+Label and value pages, the port detail, Device, Settings and the policy page,
+put the label at the left padding and right-align the value three columns
+before the rail, two at the minimum width.
 
-Two spaces separate the data, voltage and current cells.
+The left and right padding inside the rails are equal: three columns at width
+72 and above, two below. The header, footer, status line, `last` line and every
+page follow the same padding.
 
 At 80x24, control page, LIVE:
 
 ```
-   │HUBCTL  USB CONTROL                                              live  │
-   │                                                                       │
-   │   port /dev/ttyACM0   normal   live   poll 1.0 s                      │
-   │                                                                       │
-   │   USB PORT 1  ON  data on   4.61 V     0.00 A                         │
-   │   USB PORT 2  off -         (202 mV)   0.00 A                         │
-   │   USB PORT 3  ON  data off  5.02 V     0.21 A                         │
-   │   USB PORT 4  ON  data on   4.88 V     0.44 A                         │
-   │                                                                       │
-   │   ...                                                                 │
-   │   last    USB2 off - echo ok, 0x00 off, 0x08 off                      │
-   │SPACE power   d data   m menu   q quit                                 │
+│HUBCTL  USB CONTROL                                                     live  │
+│                                                                              │
+│   port /dev/ttyACM0   normal   live   poll 1.0 s                             │
+│                                                                              │
+│   USB PORT 1  ON        data on       4.61 V         0.00 A       0.00 W     │
+│   USB PORT 2  off       -             (202 mV)       0.00 A       0.00 W     │
+│   USB PORT 3  ON        data off      5.02 V         0.21 A       1.05 W     │
+│   USB PORT 4  ON        data on       4.88 V         0.44 A       2.15 W     │
+   ...
+│   last    USB2 off - echo ok, 0x00 off, 0x08 off                             │
+│SPACE power   d data   a auto   p pause   q quit                              │
 ```
 
 Trailing padding to the right rail is spaces; the diagram compresses the middle
@@ -89,11 +91,17 @@ menu.
 Each row shows power, data, voltage and current. The selected row is the only
 row in reverse video.
 
-Footer: `SPACE power   d data   m menu   q quit`. On LOST and no device it
-becomes `r retry` in place of `r refresh`; the no-device footer is
-`r retry   m menu   q quit`.
+Footer: `SPACE power   d data   a auto   p pause   q quit`. On LOST it becomes
+`r retry   a auto   p pause   q quit`; the no-device footer is the same.
 
-`Enter` opens the selected port's detail page. The footer does not mention it.
+`Enter` opens the selected port's detail page. `a` opens the selected port's
+policy page and `p` pauses or resumes automation.
+
+An enabled policy marks its port row with `A` at column 3. The status line ends
+with `auto <n>` when at least one port has an enabled policy, `auto paused`, or
+`auto off - poll too long` above a 1 s poll. With no enabled policy, no pause and
+a normal poll, the field is omitted. At 60 columns the status drops
+`poll <n> s` first; it never drops the auto field.
 
 ### 3.2 Port detail
 
@@ -109,7 +117,8 @@ is powered. Status line: `port <port>   1a86:fe0c   <link>`.
 | 9 | `usb` | `045e:028e`, `data off` or `no device` |
 | 10 | `product` | the device's product string, when row 9 has a device |
 
-Labels at column 8, values at column 20, in the same tokens as the port row.
+Labels at column 5, values right-aligned at the rail, in the same tokens as the
+port row.
 Rows 11 and 12 stay free for the monitor and advanced controls that come next.
 `Back` is the only item, at row 13, selected.
 
@@ -136,8 +145,8 @@ not a peer page.
 | 6 | first item |
 | ... | one item per row |
 
-v1 has three items: `Device`, `Settings` and `Help`. Later global actions append
-here. The selected item is the only reverse-video row. `j` and `k` wrap between
+v1 has four items: `Device`, `Auto`, `Settings` and `Help`. Later global
+actions append here. The selected item is the only reverse-video row. `j` and `k` wrap between
 items.
 
 Footer: `ENTER open   m close   q close`. `m`, `Esc` and `q` close the menu and
@@ -146,16 +155,18 @@ return to the list with the same port selected. Closing the menu never quits.
 At 80x24 with the menu open:
 
 ```
-   │HUBCTL  USB CONTROL                                              live  │
-   │                                                                       │
-   │   port /dev/ttyACM0   normal   live   poll 1.0 s                      │
-   │                                                                       │
-   │   GLOBAL MENU                                                         │
-   │   Device                                                              │
-   │   Help                                                               │
-   │                                                                       │
-   │   last    USB2 off - echo ok, 0x00 off, 0x08 off                      │
-   │ENTER open   m close   q close                                         │
+│HUBCTL  USB CONTROL                                                     live  │
+│                                                                              │
+│   port /dev/ttyACM0   normal   live   poll 1.0 s                             │
+│                                                                              │
+│   GLOBAL MENU                                                                │
+│   Device                                                                     │
+│   Auto                                                                       │
+│   Settings                                                                   │
+│   Help                                                                       │
+   ...
+│   last    USB2 off - echo ok, 0x00 off, 0x08 off                             │
+│ENTER open   m close   q close                                                │
 ```
 
 ### 3.4 Settings
@@ -168,7 +179,7 @@ Header title `HUBCTL  SETTINGS`. Status line:
 | 5 | `port` | `auto` or a discovered endpoint, including the current one |
 | 6 | `poll` | `0.5 s`, `1.0 s`, `2.0 s`, `5.0 s` |
 
-Labels at column 8, values at column 20. `j` and `k` select a row; `Left` and
+Labels at column 5, values right-aligned at the rail. `j` and `k` select a row; `Left` and
 `Right` step the value and wrap. `Back` is at row 13, selected.
 
 Footer: `LEFT/RIGHT change   ENTER back   q back`. `Enter`, `q`, `Esc` and `m`
@@ -179,7 +190,37 @@ endpoint, or by discovery for `auto`. Changing `poll` takes effect on the next
 cycle. Both write a result to the `last` line, which stays visible below the
 settings.
 
-### 3.5 Device
+### 3.5 Port policy
+
+Header title `HUBCTL  AUTO - USB PORT n`, for the port selected on the control
+page. `a` on the control page opens it, and the menu's `Auto` item opens it for
+the same selected port. Status line as on the control page.
+
+| Row | Setting | Values |
+| --- | --- | --- |
+| 5 | `enabled` | `off`, `on` |
+| 6 | `cycle` | `off`, `1`, `5`, `10`, `30`, `60 min` |
+| 7 | `overcurrent` | `off`, `0.5`, `1.0`, `1.5`, `2.0 A` |
+| 8 | `retry` | `off`, `10`, `30`, `60 s` |
+| 9 | `recovery` | `off`, `1`, `5`, `10 min` |
+| 10 | `schedule` | `off`, `on` |
+| 11 | `from` | `00`..`23`, wraps; `--` while the schedule is off |
+| 12 | `to` | `00`..`23`, wraps; `--` while the schedule is off |
+| 13 | `Back` | |
+
+Row 14 is a dim line: `rules clear when hubctl exits`.
+
+`j`/`k` select a row; `Left`/`Right` step the value and wrap. Values are stored
+even while `enabled` is off. `Back` is at row 13.
+
+Footer: `LEFT/RIGHT change   p pause   ENTER back   q back`. `Enter`, `q` and
+`Esc` return to the control page; `m` also returns to control. `p` pauses or
+resumes automation.
+
+The rules and their priority are in
+[ARCH-002 §4](../architecture/policy.md).
+
+### 3.6 Device
 
 Header title `HUBCTL  DEVICE`. Status line:
 `port <port>   1a86:fe0c   <link>`. Rows 5..11, label at 8 and value at 20:
@@ -198,7 +239,7 @@ Header title `HUBCTL  DEVICE`. Status line:
 Footer: `ENTER back   q back`. `Enter`, `q` and `Esc` return to the control
 page. The `last` line stays on row `H-1`.
 
-### 3.6 Help
+### 3.7 Help
 
 Header title `HUBCTL  HELP`. Status line: `port <port>   1a86:fe0c   <link>`.
 
@@ -213,11 +254,11 @@ Header title `HUBCTL  HELP`. Status line: `port <port>   1a86:fe0c   <link>`.
 | 12 | `q       quit, Esc back` |
 | 13 | `Back`, selected |
 
-Keys are at column 8 in an 8-column cell, the description at column 16.
+Keys are at column 5 in an 8-column cell, the description at column 13.
 `Enter`, `q`, `Esc` and `m` return to the control page. Footer:
 `ENTER back   q back`. The `last` line stays on row `H-1`.
 
-### 3.7 No device
+### 3.8 No device
 
 Control page with no identity:
 
@@ -228,8 +269,9 @@ Control page with no identity:
 | 6 | `connect the CMD USB-C port, or pass --port /dev/ttyACM0.` in dim |
 | 8 | no port rows |
 
-The `last` row is blank. The menu still opens with its `Device` item, whose
-fields all read `?`.
+The `last` row is blank. The menu still opens with `Device`, `Auto`, `Settings`
+and `Help`; Device fields all read `?`. `a` does nothing without a port, so there
+is nothing to configure until the device connects.
 
 ## 4. States
 
@@ -237,9 +279,9 @@ fields all read `?`.
 | --- | --- | --- | --- | --- |
 | LIVE | `live` ok | full colour | allowed | normal |
 | STALE | `stale <age> s` warn | values dim | refused | normal |
-| LOST | `lost - retry <n> s` err | every field `?`, dim | refused | `r retry` replaces `r refresh` |
+| LOST | `lost - retry <n> s` err | every field `?`, dim | refused | `r retry   a auto   p pause   q quit` |
 | INTERLOCK | `interlock` warn | banner on row 4, values live | refused | normal |
-| NO DEVICE | `no device` warn | message block only | none | `r retry   m menu   q quit` |
+| NO DEVICE | `no device` warn | message block only | none | `r retry   a auto   p pause   q quit` |
 
 A refused write still reaches the controller, which writes the reason to
 `last`. The page never invents a refusal of its own. A single late poll is
@@ -251,29 +293,30 @@ The interlock banner is one line, naming the physical button on the unit:
 
 ## 5. Keys
 
-| Key | Control | Port detail | Global menu | Settings | Device | Help | Guard |
+| Key | Control | Port policy | Port detail | Global menu | Settings | Device | Help |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `j`, `Down` | next port | none | next item | next setting | none | none | wraps |
-| `k`, `Up` | previous port | none | previous item | previous setting | none | none | wraps |
-| `Left`, `Right` | none | none | none | step the value | none | none | — |
-| `Enter` | open port detail | back | open item | back | back | back | 0.4 s |
-| `Space` | toggle VBUS on the selected port | none | none | none | none | none | 0.4 s |
-| `d` | toggle D+/D- on the selected port | none | none | none | none | none | 0.4 s |
-| `m` | open menu | back to control | close | back to control | back to control | back to control | 0.4 s |
-| `r` | poll now | poll now | poll now | poll now | poll now | poll now | — |
-| `q`, `Esc` | quit | back | close | back | back | back | — |
-| `Ctrl-C` | quit | quit | quit | quit | quit | quit | — |
-| resize | redraw | redraw | redraw | redraw | redraw | redraw | below 60x16 show the size message |
+| `j`, `Down` | next port | next row | none | next item | next setting | none | none |
+| `k`, `Up` | previous port | previous row | none | previous item | previous setting | none | none |
+| `Left`, `Right` | none | step the value | none | none | step the value | none | none |
+| `Enter` | open port detail | back | back | open item | back | back | back |
+| `a` | open the selected port's policy | none | none | none | none | none | none |
+| `p` | pause automation | pause automation | none | none | none | none | none |
+| `Space` | toggle VBUS on the selected port | none | none | none | none | none | none | none |
+| `d` | toggle D+/D- on the selected port | none | none | none | none | none | none | none |
+| `m` | open menu | back to control | back to control | back to control | close | back to control | back to control | back to control |
+| `r` | poll now | poll now | poll now | poll now | poll now | poll now | poll now | poll now |
+| `q`, `Esc` | quit | back | back to the list | back | close | back | back | back |
+| `Ctrl-C` | quit | quit | quit | quit | quit | quit | quit | quit |
 
 The 0.4 s guard is per key, and every event of a guarded key refreshes its
 timestamp, including a dropped one. Holding a key acts at most once when
 autorepeat begins and then stays silent until it is released. Only `Space` and
-`d` write. `Enter` never writes and does nothing on the control page in v1.
+`d` write. `Enter` never writes; on the control page it opens the port detail.
 
 ## 6. The `last` line
 
 Every write ends here with what actually happened. The text must fit the
-40 columns between column 16 and the right rail at 60 columns; longer text is
+columns between column 13 and the right rail at 60 columns; longer text is
 clipped.
 
 | Result | Text |
@@ -287,6 +330,10 @@ clipped.
 | rejection | `interlock - 0x01 rejected` |
 | link failure | `USB2 off - no reply, link lost` |
 | data while off | `USB2 data needs power - key ignored` |
+
+Automated writes use the same form and name the rule, for example
+`USB2 off - auto overcurrent 1.62 A` and `USB2 on - auto cycle`. The full table
+is in [ARCH-002 §6](../architecture/policy.md).
 
 `USBn` is the result-line abbreviation for `USB PORT n`. A readback mismatch is
 a device-state result, never a link failure, and never a reason to reconnect.
@@ -308,9 +355,9 @@ state values.
 | bar | bold + reverse (`SGR 1;7`) | same | header, footer |
 | selection | bold + reverse (`SGR 1;7`) | same | selected port or menu item |
 
-Selection is a bold reverse fill across the item text: for a port row, from the
-label through the current cell; for a menu or Device row, the label plus one
-trailing space. It is the only selection cue and it survives `NO_COLOR`, because
+Selection is a bold reverse fill across the item: for a port row, from the label
+through the watt cell; for a menu row, the label plus one trailing space; for a
+label and value row, the full interior of the frame. It is the only selection cue and it survives `NO_COLOR`, because
 it uses reverse video, not colour.
 
 With `NO_COLOR` or `TERM=dumb`, emit no SGR colour; keep bold, faint and
@@ -325,8 +372,8 @@ frame boundary, raw fd read with `select(..., 50 ms)`, terminal restored in
 `stale <age> s` and the retry countdown moving between device replies.
 
 The header and footer bars are one `bold + reverse` span each. Every line is
-padded with spaces to exactly `width`; the rails are written at columns 4 and
-`W-4`. The menu block overwrites only rows 5..H-2, so the page chrome is
+padded with spaces to exactly `width`; the rails are written at columns 1 and
+`W`. The menu block overwrites only rows 5..H-2, so the page chrome is
 untouched.
 
 Only the four arrow keys decode as arrows. A lone `Esc` keypress is `escape`.
@@ -349,17 +396,22 @@ streaming, no interlock control.
 
 | Clause | Method | Where |
 | --- | --- | --- |
-| Frame: rails at 4 and `W-4`, bars on rows 1 and `H`, `last` on `H-1` | pure `render()` assertions | host |
+| Frame: rails at 1 and `W`, bars on rows 1 and `H`, `last` on `H-1` | pure `render()` assertions | host |
 | Every line exactly `width` visible columns, 60x16 to 200x60, at 60, 80, 120, 200 | render sweep | host |
-| Port rows use the fixed columns, one per probed port, 1..7 | render at 4 and 7 ports | host |
+| Port rows use the spread columns, one per probed port, 1..7 | render at 4 and 7 ports | host |
 | Selection is one reverse-video row on ports and in the menu, survives `NO_COLOR` | assert `SGR 7` on exactly one row | host |
 | `m` replaces the port rows with the menu, keeps header, status, `last`, footer | render assertion | host |
 | Enter opens the selected port detail with four labelled fields; Enter, q, Esc and m return | render and TUI assertions | host |
 | Port detail shows the downstream device only with data on and a matching sysfs child | render, usbmap and TUI assertions | host |
 | `m`, `Esc` and `q` close the menu and never quit | TUI loop with a fake controller | host |
-| Menu items `Device`, `Settings` and `Help`; `j`/`k` wrap and Enter opens the selection | menu and TUI assertions | host |
+| Menu items are `Device`, `Auto`, `Settings` and `Help`. The list is only the four ports. | menu and TUI assertions | host |
 | Help shows the package version and the key list; Enter, q, Esc and m return | render and TUI assertions | host |
-| Enter on a port does nothing; Enter opens Device from the menu; Enter returns from Device | TUI loop | host |
+| Enter on a port opens its detail; Enter opens the selected menu item; q/Esc/Enter return | TUI loop | host |
+| The port policy page renders and steps every value, for the selected port | render and TUI assertions | host |
+| `A` markers, `auto <n>` and `auto paused` follow the policy state | render assertions | host |
+| A rule fires only on a LIVE link in normal mode, never while paused or in the manual hold | pure `decide()` assertions | host |
+| Priority: overcurrent, recovery, cycle, schedule, pending on | pure truth table | host |
+| One automated write per poll and no replay after reconnect | controller with a fake clock | host |
 | Space and `d` write on the control page; the guard is per key; Enter never writes | TUI loop | host |
 | Power-off port: data cell `-`, data write refused with a `last` note | render and loop assertions | host |
 | STALE and LOST dim values, `?` fields, `r retry` | render assertion | host |

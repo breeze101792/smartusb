@@ -22,14 +22,15 @@ The last command reads the unit and switches nothing.
 | --- | --- | --- | --- |
 | T-APP-001 | V1/V2/V3 framing, CRC, resync, truncation, masks | `tests/test_protocol.py` | 8 pass |
 | T-APP-002 | Driver identity, status, reads, writes, interlock rejection, bad echo, silence, allow-list, unsolicited report | `tests/test_driver.py` (pty fake) | 10 pass |
-| T-APP-003 | Controller poll cycle, staleness, deadline, write readback, mismatch, rejection, data guard, backoff, identity gate, no replay, result strings, link loss during readback, port and poll settings | `tests/test_controller.py` (fake driver, fake clock) | 23 pass |
-| T-APP-004 | Frame: rails, bars, badge, port grid, reverse-video selection, residual voltage, data dash, every link state, interlock, no device, 60x16, ASCII rails, width/height sweep, clipping, LOST dim, menu, port detail, Device, Help, Settings, all thirteen mockup frames, downstream usb rows | `tests/test_view.py` | 35 pass |
+| T-APP-003 | Controller poll cycle, staleness, deadline, write readback, mismatch, rejection, data guard, backoff, identity gate, no replay, result strings, link loss during readback, port and poll settings, `set_power`, automatic writes | `tests/test_controller.py` (fake driver, fake clock) | 41 pass |
+| T-APP-004 | Frame: rails, bars, badge, port grid, reverse-video selection, residual voltage, data dash, every link state, interlock, no device, 60x16, ASCII rails, width/height sweep, clipping, LOST dim, menu, port detail, Device, Help, Settings, all sixteen mockup frames, downstream usb rows, policy page | `tests/test_view.py` | 46 pass |
 | T-APP-005 | Discovery keeps `fe0c`, rejects `8091` | `tests/test_discovery.py` (fake sysfs tree) | 2 pass |
 | T-APP-006 | Real app process: start, draw, toggle a port with Space, open the menu, quit, alternate-screen restore; no-device state | `tests/test_app_pty.py` (pty + FakeHub) | 2 pass |
-| T-APP-007 | Control page, port detail, global menu and Settings: port list, selection wrap, Enter opens the port detail, Enter opens Device, Settings or Help, value stepping | `tests/test_menu.py` | 32 pass |
-| T-APP-008 | TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, Left/Right change settings, usb map read only with data on, every screen redrawn twice, per-key repeat guard | `tests/test_tui.py` (fake controller, terminal and clock) | 21 pass |
+| T-APP-007 | Control page, port detail, global menu, Settings and the per-port policy page: selection, navigation, value stepping, pause | `tests/test_menu.py` | 39 pass |
+| T-APP-008 | TUI loop: `m` opens and closes, Enter opens the port detail, Device, Settings and Help, Left/Right change settings, usb map read only with data on, `a`/`p` and policy stepping, every screen redrawn twice, per-key repeat guard | `tests/test_tui.py` (fake controller, terminal and clock) | 25 pass |
 | T-APP-009 | Key decode: arrows, lone Esc, unknown escape sequences ignored, plain keys | `tests/test_term.py` (pipe fd) | 4 pass |
 | T-APP-010 | Downstream USB map: DATA hub discovery, port child lookup, empty port, missing tree | `tests/test_usbmap.py` (fake sysfs tree) | 4 pass |
+| T-APP-011 | Automatic control: every rule, priority, gates, timer cancellation, retry cap, schedule edges and clock jump | `tests/test_policy.py` (fake clocks) | 54 pass |
 
 The pty fake can stay silent, reject `0x01`, echo the wrong value, inject an
 unsolicited `0x00`, and disconnect.
@@ -46,6 +47,7 @@ unsolicited `0x00`, and disconnect.
 | T-HW-006 | SIGTERM during the TUI, then inspect `stty` | pass — exit 130, alternate screen left, cursor shown, `icanon` and `OPOST` restored |
 | T-HW-007 | Port detail shows the downstream device when data is on | pass — USB PORT 4, `08bb:2902`, `USB PnP Sound Device` |
 | T-HW-008 | Visit control, port detail, menu, Settings and Help with redraws, no traceback | pass — exit 0, every screen drawn, no exception |
+| T-HW-009 | Enable cycle on an ON port and observe one automatic power cycle | not run — needs explicit approval |
 
 ## Not covered
 
