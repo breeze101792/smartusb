@@ -145,7 +145,7 @@ not a peer page.
 | 6 | first item |
 | ... | one item per row |
 
-v1 has four items: `Device`, `Auto`, `Settings` and `Help`. Later global
+v1 has three items: `Device`, `Settings` and `Help`. Later global
 actions append here. The selected item is the only reverse-video row. `j` and `k` wrap between
 items.
 
@@ -161,9 +161,9 @@ At 80x24 with the menu open:
 │                                                                              │
 │   GLOBAL MENU                                                                │
 │   Device                                                                     │
-│   Auto                                                                       │
 │   Settings                                                                   │
 │   Help                                                                       │
+│                                                                              │
    ...
 │   last    USB2 off - echo ok, 0x00 off, 0x08 off                             │
 │ENTER open   m close   q close                                                │
@@ -193,8 +193,7 @@ settings.
 ### 3.5 Port policy
 
 Header title `HUBCTL  AUTO - USB PORT n`, for the port selected on the control
-page. `a` on the control page opens it, and the menu's `Auto` item opens it for
-the same selected port. Status line as on the control page.
+page. `a` on the control page opens it for the selected port. Status line as on the control page.
 
 | Row | Setting | Values |
 | --- | --- | --- |
@@ -269,8 +268,8 @@ Control page with no identity:
 | 6 | `connect the CMD USB-C port, or pass --port /dev/ttyACM0.` in dim |
 | 8 | no port rows |
 
-The `last` row is blank. The menu still opens with `Device`, `Auto`, `Settings`
-and `Help`; Device fields all read `?`. `a` does nothing without a port, so there
+The `last` row is blank. The menu still opens with `Device`, `Settings` and
+`Help`; Device fields all read `?`. `a` does nothing without a port, so there
 is nothing to configure until the device connects.
 
 ## 4. States
@@ -404,7 +403,7 @@ streaming, no interlock control.
 | Enter opens the selected port detail with four labelled fields; Enter, q, Esc and m return | render and TUI assertions | host |
 | Port detail shows the downstream device only with data on and a matching sysfs child | render, usbmap and TUI assertions | host |
 | `m`, `Esc` and `q` close the menu and never quit | TUI loop with a fake controller | host |
-| Menu items are `Device`, `Auto`, `Settings` and `Help`. The list is only the four ports. | menu and TUI assertions | host |
+| Menu items are `Device`, `Settings` and `Help`. The list is only the four ports. | menu and TUI assertions | host |
 | Help shows the package version and the key list; Enter, q, Esc and m return | render and TUI assertions | host |
 | Enter on a port opens its detail; Enter opens the selected menu item; q/Esc/Enter return | TUI loop | host |
 | The port policy page renders and steps every value, for the selected port | render and TUI assertions | host |

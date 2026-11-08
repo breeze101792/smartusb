@@ -19,7 +19,6 @@ HELP = "help"
 
 # Item actions.
 OPEN_DEVICE = "open-device"
-OPEN_AUTO = "open-auto"
 OPEN_SETTINGS = "open-settings"
 OPEN_HELP = "open-help"
 BACK = "back"
@@ -41,7 +40,6 @@ ERR = "err"
 RAIL = "rail"
 
 LABEL_DEVICE = "Device"
-LABEL_AUTO = "Auto"
 LABEL_SETTINGS = "Settings"
 LABEL_HELP = "Help"
 LABEL_BACK = "Back"
@@ -123,7 +121,6 @@ def items(state: State) -> list[Item]:
     """The selectable menu and device rows. The control list is the ports."""
     if state.screen == MENU:
         return [Item(LABEL_DEVICE, OPEN_DEVICE),
-                Item(LABEL_AUTO, OPEN_AUTO),
                 Item(LABEL_SETTINGS, OPEN_SETTINGS),
                 Item(LABEL_HELP, OPEN_HELP)]
     if state.screen in (PORT, DEVICE, SETTINGS, HELP, POLICY):
@@ -295,13 +292,6 @@ def _enter(snapshot: Snapshot,
     item = items(state)[index(snapshot, state)]
     if item.action == OPEN_DEVICE:
         return replace(state, screen=DEVICE), None
-    if item.action == OPEN_AUTO:
-        count = port_count(snapshot)
-        if count == 0:
-            return state, None
-        return replace(state, screen=POLICY,
-                       port=min(state.port_index, count - 1) + 1,
-                       policy_index=0), None
     if item.action == OPEN_SETTINGS:
         return replace(state, screen=SETTINGS, settings_index=0), None
     if item.action == OPEN_HELP:

@@ -18,14 +18,13 @@ class PortTests(unittest.TestCase):
 
 
 class ItemTests(unittest.TestCase):
-    def test_menu_has_device_auto_settings_and_help(self):
+    def test_menu_has_device_settings_and_help(self):
         entries = menu.items(menu.State(menu.MENU))
         self.assertEqual([item.label for item in entries],
-                         ["Device", "Auto", "Settings", "Help"])
+                         ["Device", "Settings", "Help"])
         self.assertEqual(entries[0].action, menu.OPEN_DEVICE)
-        self.assertEqual(entries[1].action, menu.OPEN_AUTO)
-        self.assertEqual(entries[2].action, menu.OPEN_SETTINGS)
-        self.assertEqual(entries[3].action, menu.OPEN_HELP)
+        self.assertEqual(entries[1].action, menu.OPEN_SETTINGS)
+        self.assertEqual(entries[2].action, menu.OPEN_HELP)
 
     def test_device_and_help_have_back_only(self):
         for screen in (menu.DEVICE, menu.SETTINGS, menu.HELP,
@@ -205,7 +204,7 @@ class KeyTests(unittest.TestCase):
         self.assertEqual(action.value, 2.0)
 
     def test_enter_on_settings_returns_to_control(self):
-        state = menu.State(menu.MENU, menu_index=2)
+        state = menu.State(menu.MENU, menu_index=1)
         settings, action = menu.handle_key(self.snapshot, state, "enter")
         self.assertIsNone(action)
         self.assertEqual(settings.screen, menu.SETTINGS)
@@ -282,14 +281,9 @@ class AutoTests(unittest.TestCase):
     def setUp(self):
         self.snapshot = make_snapshot(channels=4)
 
-    def test_menu_opens_auto_for_the_selected_port(self):
-        state = menu.State(menu.MENU, menu_index=1, port_index=2)
-        opened, action = menu.handle_key(self.snapshot, state, "enter")
-        self.assertIsNone(action)
-        self.assertEqual(opened.screen, menu.POLICY)
-        self.assertEqual(opened.port, 3)
-        for index, screen in ((0, menu.DEVICE), (2, menu.SETTINGS),
-                              (3, menu.HELP)):
+    def test_menu_does_not_open_auto(self):
+        for index, screen in ((0, menu.DEVICE), (1, menu.SETTINGS),
+                              (2, menu.HELP)):
             state, action = menu.handle_key(
                 self.snapshot, menu.State(menu.MENU, menu_index=index),
                 "enter")

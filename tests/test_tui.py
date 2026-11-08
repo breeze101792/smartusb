@@ -201,7 +201,7 @@ class MenuTests(unittest.TestCase):
 
     def test_navigate_to_help_and_back(self):
         code, controller, terminal = run_loop(
-            [("m", 0.0), ("j", GAP), ("j", 1.0), ("j", 1.2), ("enter", 1.5),
+            [("m", 0.0), ("j", GAP), ("j", 1.0), ("enter", 1.5),
              ("q", 2.0), ("q", 2.5)])
         self.assertEqual(code, 0)
         self.assertTrue(any("HUBCTL  HELP" in line
@@ -322,7 +322,7 @@ class RefreshTests(unittest.TestCase):
 
     def test_settings_changes_poll_and_port(self):
         code, controller, terminal = run_loop(
-            [("m", 0.0), ("j", GAP), ("j", 1.0), ("enter", 1.5),
+            [("m", 0.0), ("j", GAP), ("enter", 1.5),
              ("j", 2.0), ("right", 2.5), ("k", 3.0), ("right", 3.5),
              ("q", 4.0), ("q", 4.5)])
         self.assertEqual(code, 0)
